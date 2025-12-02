@@ -107,6 +107,17 @@ export default function AuthPage() {
             />
           </div>
 
+          {isLogin && (
+            <div className="text-right text-xs text-gray-600">
+              <a
+                href="/auth/reset"
+                className="text-pastel-orange hover:underline"
+              >
+                パスワードをお忘れですか？
+              </a>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={isLoading}
