@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { MapPin, Calendar, ExternalLink, ArrowLeft, Heart, Flag } from 'lucide-react'
+import { MapPin, Calendar, ExternalLink, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { formatDateRange } from '@/lib/utils/event'
 import HeaderAuth from '@/components/HeaderAuth'
 import EventActions from '@/components/EventActions'
+import EventImage from '@/components/EventImage'
 
 interface PageProps {
   params: {
@@ -58,21 +59,7 @@ export default async function EventDetailPage({ params }: PageProps) {
         <div className="max-w-4xl mx-auto">
           {/* イベント画像 */}
           <div className="relative h-64 sm:h-96 bg-gray-200 rounded-2xl sm:rounded-3xl overflow-hidden mb-6">
-            {event.image_url ? (
-              <img
-                src={event.image_url}
-                alt={event.title}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.style.display = 'none'
-                }}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pastel-orange to-mint-green">
-                <span className="text-white text-4xl font-bold">?</span>
-              </div>
-            )}
+            <EventImage imageUrl={event.image_url} title={event.title} />
           </div>
 
           {/* イベント情報 */}
