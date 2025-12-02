@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap');
+
+:root {
+  --background: #FFFBF0;
+  --foreground: #171717;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'M PLUS Rounded 1c', sans-serif;
+}
+
+/* アニメーション */
+@keyframes pulse-once {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.animate-pulse-once {
+  animation: pulse-once 0.3s ease-in-out;
+}
+
