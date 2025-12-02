@@ -15,14 +15,14 @@ export default async function Home() {
   }
   console.log('User:', user ? 'Logged in' : 'Not logged in')
   
-  // イベント一覧を取得（終了していないイベントのみ）
+  // イベント一覧を取得（終了していないイベントのみ、開催日順）
   const today = new Date().toISOString().split('T')[0]
   const { data: events, error } = await supabase
     .from('events_with_stats')
     .select('*')
     .or(`end_date.gte.${today},end_date.is.null`) // 終了していないイベントまたは常設イベント
-    .order('end_date', { ascending: true, nullsFirst: false })
-    .order('created_at', { ascending: false })
+    .order('start_date', { ascending: true }) // 開催日順（早い順）
+    .order('created_at', { ascending: false }) // 同じ開催日の場合は新しい順
 
   // ユーザーのお気に入り情報を取得
   let favoriteEventIds: string[] = []

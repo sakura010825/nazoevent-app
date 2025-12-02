@@ -1,0 +1,192 @@
+import { createClient } from '@/lib/supabase/server'
+import { notFound } from 'next/navigation'
+import { MapPin, Calendar, ExternalLink, ArrowLeft, Heart, Flag } from 'lucide-react'
+import Link from 'next/link'
+import { formatDateRange } from '@/lib/utils/event'
+import HeaderAuth from '@/components/HeaderAuth'
+import EventActions from '@/components/EventActions'
+
+interface PageProps {
+  params: {
+    id: string
+  }
+}
+
+export default async function EventDetailPage({ params }: PageProps) {
+  const supabase = await createClient()
+  
+  // イベント情報を取得
+  const { data: event, error } = await supabase
+    .from('events_with_stats')
+    .select('*')
+    .eq('id', params.id)
+    .single()
+
+  if (error || !event) {
+    notFound()
+  }
+
+  // ユーザーのお気に入り情報を取得
+  const { data: { user } } = await supabase.auth.getUser()
+  let isFavorite = false
+  if (user?.id) {
+    const { data: favorite } = await supabase
+      .from('user_event_logs')
+      .select('id')
+      .eq('user_id', user.id as any)
+      .eq('event_id', event.id)
+      .eq('status', 'FAVORITE' as any)
+      .single()
+    isFavorite = !!favorite
+  }
+
+  return (
+    <main className="min-h-screen bg-cream">
+      {/* ヘッダー */}
+      <header className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">NazoNote</h1>
+          </Link>
+          <HeaderAuth />
+        </div>
+      </header>
+
+      {/* メインコンテンツ */}
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          {/* イベント画像 */}
+          <div className="relative h-64 sm:h-96 bg-gray-200 rounded-2xl sm:rounded-3xl overflow-hidden mb-6">
+            {event.image_url ? (
+              <img
+                src={event.image_url}
+                alt={event.title}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pastel-orange to-mint-green">
+                <span className="text-white text-4xl font-bold">?</span>
+              </div>
+            )}
+          </div>
+
+          {/* イベント情報 */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md p-6 sm:p-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">
+              {event.title}
+            </h1>
+
+            {/* 基本情報 */}
+            <div className="space-y-4 mb-6">
+              {event.location && (
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">開催場所</div>
+                    <div className="text-gray-800">{event.location}</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start gap-3">
+                <Calendar className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">開催期間</div>
+                  <div className="text-gray-800">{formatDateRange(event.start_date, event.end_date)}</div>
+                </div>
+              </div>
+
+              {event.area && (
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">エリア</div>
+                    <div className="text-gray-800">{event.area}</div>
+                  </div>
+                </div>
+              )}
+
+              {event.type && (
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">タイプ</div>
+                    <div className="text-gray-800">{event.type}</div>
+                  </div>
+                </div>
+              )}
+
+              {event.maker && (
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">制作団体</div>
+                    <div className="text-gray-800">{event.maker}</div>
+                  </div>
+                </div>
+              )}
+
+              {event.price && (
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">価格</div>
+                    <div className="text-lg font-semibold text-pastel-orange">{event.price}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 説明 */}
+            {event.description && (
+              <div className="mb-6 pt-6 border-t border-gray-200">
+                <h2 className="text-lg font-bold text-gray-800 mb-3">ストーリー・概要</h2>
+                <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                  {event.description}
+                </div>
+              </div>
+            )}
+
+            {/* 外部サイトリンク */}
+            {event.url && (
+              <div className="mb-6 pt-6 border-t border-gray-200">
+                <a
+                  href={event.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-pastel-orange text-white rounded-2xl font-semibold hover:bg-opacity-90 transition-colors"
+                >
+                  <ExternalLink className="w-5 h-5" />
+                  <span>公式サイトで確認する</span>
+                </a>
+              </div>
+            )}
+
+            {/* アクションボタン */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <EventActions event={event as any} initialIsFavorite={isFavorite} />
+            </div>
+
+            {/* 統計情報 */}
+            {(event.favorite_count > 0 || event.went_count > 0) && (
+              <div className="mt-6 pt-6 border-t border-gray-200 flex gap-6 text-sm text-gray-500">
+                {event.favorite_count > 0 && (
+                  <span>❤️ {event.favorite_count}人が気になる</span>
+                )}
+                {event.went_count > 0 && (
+                  <span>🚩 {event.went_count}人が行った</span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </main>
+  )
+}
+

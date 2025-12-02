@@ -6,6 +6,7 @@ import { getStatusBadge, formatDateRange } from '@/lib/utils/event'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import LogEventModal from './LogEventModal'
+import Link from 'next/link'
 
 interface EventCardProps {
   event: EventCard
@@ -67,9 +68,10 @@ export default function EventCardComponent({ event }: EventCardProps) {
 
   return (
     <>
-      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-        {/* 画像 */}
-        <div className="relative h-48 bg-gray-200 overflow-hidden">
+      <Link href={`/events/${event.id}`} className="block">
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
+          {/* 画像 */}
+          <div className="relative h-48 bg-gray-200 overflow-hidden">
         {event.image_url ? (
           <img
             src={event.image_url}
@@ -154,15 +156,20 @@ export default function EventCardComponent({ event }: EventCardProps) {
         {/* 行ったボタン */}
         <div className="mt-4 pt-4 border-t border-gray-100">
           <button
-            onClick={() => setShowLogModal(true)}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setShowLogModal(true)
+            }}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-mint-green text-gray-800 rounded-2xl font-semibold hover:bg-opacity-80 transition-colors"
           >
             <Flag className="w-4 h-4" />
             <span>行った🚩</span>
           </button>
         </div>
+        </div>
       </div>
-      </div>
+      </Link>
 
       {showLogModal && (
         <LogEventModal
