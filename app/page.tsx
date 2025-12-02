@@ -26,20 +26,21 @@ export default async function Home() {
 
   // ユーザーのお気に入り情報を取得
   let favoriteEventIds: string[] = []
-  if (user && user.id) {
+  if (user?.id) {
+    const userId = user.id
     const { data: favorites } = await supabase
       .from('user_event_logs')
       .select('event_id')
-      .eq('user_id', user.id as string)
-      .eq('status', 'FAVORITE')
-    favoriteEventIds = favorites?.map(f => f.event_id) || []
+      .eq('user_id', userId as any)
+      .eq('status', 'FAVORITE' as any)
+    favoriteEventIds = (favorites as any)?.map((f: any) => f.event_id) || []
   }
 
   // イベントにお気に入り情報を追加
-  const eventsWithFavorite = events?.map(event => ({
+  const eventsWithFavorite = (events || []).map((event: any) => ({
     ...event,
     isFavorite: favoriteEventIds.includes(event.id),
-  })) || []
+  }))
 
   if (error) {
     console.error('Error fetching events:', error)
