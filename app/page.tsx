@@ -26,11 +26,11 @@ export default async function Home() {
 
   // ユーザーのお気に入り情報を取得
   let favoriteEventIds: string[] = []
-  if (user) {
+  if (user && user.id) {
     const { data: favorites } = await supabase
       .from('user_event_logs')
       .select('event_id')
-      .eq('user_id', user.id)
+      .eq('user_id', user.id as string)
       .eq('status', 'FAVORITE')
     favoriteEventIds = favorites?.map(f => f.event_id) || []
   }
