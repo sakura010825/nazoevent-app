@@ -40,7 +40,17 @@ export default function ColorPalette() {
 
   const applyBackgroundColor = (colorValue: string) => {
     const color = COLOR_MAP[colorValue] || COLOR_MAP['white']
+    // CSS変数を更新
     document.documentElement.style.setProperty('--background', color)
+    // body要素に直接背景色を適用
+    if (typeof document !== 'undefined') {
+      document.body.style.backgroundColor = color
+      // main要素にも適用（bg-creamクラスを上書き）
+      const mainElement = document.querySelector('main')
+      if (mainElement) {
+        mainElement.style.backgroundColor = color
+      }
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('background-color', colorValue)
     }

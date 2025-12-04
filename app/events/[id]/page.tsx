@@ -43,7 +43,7 @@ export default async function EventDetailPage({ params }: PageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-cream">
+    <main className="min-h-screen" style={{ backgroundColor: 'var(--background, #FFFBF0)' }}>
       {/* ヘッダー */}
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
