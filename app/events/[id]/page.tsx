@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { MapPin, Calendar, ExternalLink, ArrowLeft } from 'lucide-react'
+import { MapPin, Calendar, ExternalLink, ArrowLeft, PawPrint } from 'lucide-react'
 import Link from 'next/link'
 import { formatDateRange } from '@/lib/utils/event'
 import HeaderAuth from '@/components/HeaderAuth'
 import EventActions from '@/components/EventActions'
 import EventImage from '@/components/EventImage'
+import EventDetailActions from '@/components/EventDetailActions'
 
 interface PageProps {
   params: {
@@ -64,9 +65,14 @@ export default async function EventDetailPage({ params }: PageProps) {
 
           {/* イベント情報 */}
           <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md p-6 sm:p-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">
-              {event.title}
-            </h1>
+            <div className="flex items-start gap-3 mb-6">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex-1">
+                {event.title}
+              </h1>
+              {(event as any).is_purchased && (
+                <PawPrint className="w-8 h-8 text-black flex-shrink-0" />
+              )}
+            </div>
 
             {/* 基本情報 */}
             <div className="space-y-4 mb-6">
@@ -155,8 +161,9 @@ export default async function EventDetailPage({ params }: PageProps) {
             )}
 
             {/* アクションボタン */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="mt-6 pt-6 border-t border-gray-200 space-y-4">
               <EventActions event={event as any} initialIsFavorite={isFavorite} />
+              <EventDetailActions event={event as any} />
             </div>
 
             {/* 統計情報 */}

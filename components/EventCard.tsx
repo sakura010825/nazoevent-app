@@ -1,11 +1,13 @@
 'use client'
 
 import { EventCard } from '@/types/event'
-import { Heart, MapPin, Calendar, Flag } from 'lucide-react'
+import { Heart, MapPin, Calendar, Flag, Edit, Trash2, PawPrint } from 'lucide-react'
 import { getStatusBadge, formatDateRange } from '@/lib/utils/event'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import LogEventModal from './LogEventModal'
+import EditEventModal from './EditEventModal'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 interface EventCardProps {
@@ -16,7 +18,17 @@ export default function EventCardComponent({ event }: EventCardProps) {
   const [isFavorite, setIsFavorite] = useState(event.isFavorite || false)
   const [isLoading, setIsLoading] = useState(false)
   const [showLogModal, setShowLogModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const supabase = createClient()
+  const router = useRouter()
+
+  // ユーザー情報を取得
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUser(user)
+    })
+  }, [supabase])
 
   const statusBadge = getStatusBadge(
     event.current_status as '開催中' | '開催予定' | '終了',
@@ -116,9 +128,14 @@ export default function EventCardComponent({ event }: EventCardProps) {
 
       {/* コンテンツ */}
       <div className="p-4 sm:p-5">
-        <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2 line-clamp-2">
-          {event.title}
-        </h3>
+        <div className="flex items-start gap-2 mb-2">
+          <h3 className="text-lg sm:text-xl font-bold text-gray-800 line-clamp-2 flex-1">
+            {event.title}
+          </h3>
+          {(event as any).is_purchased && (
+            <PawPrint className="w-5 h-5 sm:w-6 sm:h-6 text-black flex-shrink-0" />
+          )}
+        </div>
 
         {/* 情報 */}
         <div className="space-y-2 text-sm text-gray-600">
@@ -153,8 +170,8 @@ export default function EventCardComponent({ event }: EventCardProps) {
           </div>
         )}
 
-        {/* 行ったボタン */}
-        <div className="mt-4 pt-4 border-t border-gray-100">
+        {/* 行ったボタンと編集・削除ボタン */}
+        <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
           <button
             onClick={(e) => {
               e.preventDefault()
@@ -166,6 +183,55 @@ export default function EventCardComponent({ event }: EventCardProps) {
             <Flag className="w-4 h-4" />
             <span>行った🚩</span>
           </button>
+
+          {/* 作成者のみ編集・削除ボタンを表示 */}
+          {currentUser && event.created_by === currentUser.id && (
+            <div className="flex gap-2">
+              <button
+                onClick={async (e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const { data: { user } } = await supabase.auth.getUser()
+                  if (user) {
+                    setShowEditModal(true)
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-xl font-semibold hover:bg-blue-200 transition-colors text-sm"
+              >
+                <Edit className="w-4 h-4" />
+                <span>編集</span>
+              </button>
+              <button
+                onClick={async (e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const { data: { user } } = await supabase.auth.getUser()
+                  if (!user) {
+                    alert('ログインが必要です')
+                    return
+                  }
+
+                  if (window.confirm('このイベントを削除してもよろしいですか？')) {
+                    const { error } = await supabase
+                      .from('events')
+                      .delete()
+                      .eq('id', event.id)
+
+                    if (error) {
+                      console.error('Error deleting event:', error)
+                      alert('イベントの削除に失敗しました')
+                    } else {
+                      router.refresh()
+                    }
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-xl font-semibold hover:bg-red-200 transition-colors text-sm"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>削除</span>
+              </button>
+            </div>
+          )}
         </div>
         </div>
       </div>
@@ -175,6 +241,13 @@ export default function EventCardComponent({ event }: EventCardProps) {
         <LogEventModal
           event={event}
           onClose={() => setShowLogModal(false)}
+        />
+      )}
+
+      {showEditModal && (
+        <EditEventModal
+          event={event}
+          onClose={() => setShowEditModal(false)}
         />
       )}
     </>

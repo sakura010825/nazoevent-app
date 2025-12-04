@@ -1,86 +1,52 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Sparkles, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { ExtractedEvent } from '@/types/extracted-event'
-import { triggerConfetti } from '@/lib/utils/confetti'
+import { EventCard } from '@/types/event'
 
-interface AddEventModalProps {
+interface EditEventModalProps {
+  event: EventCard
   onClose: () => void
 }
 
-export default function AddEventModal({ onClose }: AddEventModalProps) {
+export default function EditEventModal({ event, onClose }: EditEventModalProps) {
   const router = useRouter()
   const supabase = createClient()
   const [isLoading, setIsLoading] = useState(false)
-  const [isExtracting, setIsExtracting] = useState(false)
-  const [extractionError, setExtractionError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
-    title: '',
-    url: '',
-    image_url: '',
-    start_date: '',
-    end_date: '',
-    location: '',
-    area: '',
-    type: '',
-    maker: '',
-    price: '',
-    description: '',
-    is_purchased: false,
+    title: event.title || '',
+    url: event.url || '',
+    image_url: event.image_url || '',
+    start_date: event.start_date || '',
+    end_date: event.end_date || '',
+    location: event.location || '',
+    area: event.area || '',
+    type: event.type || '',
+    maker: event.maker || '',
+    price: event.price || '',
+    description: event.description || '',
+    is_purchased: (event as any).is_purchased || false,
   })
 
-  const handleExtractFromUrl = async () => {
-    if (!formData.url) {
-      alert('URLを入力してください')
-      return
-    }
-
-    setIsExtracting(true)
-    setExtractionError(null)
-
-    try {
-      const response = await fetch('/api/extract-event', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: formData.url }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || '抽出に失敗しました')
-      }
-
-      // 抽出されたデータをフォームに設定
-      const extracted: ExtractedEvent = data.data
-      setFormData({
-        ...formData,
-        title: extracted.title || formData.title,
-        start_date: extracted.start_date || formData.start_date,
-        end_date: extracted.end_date || formData.end_date,
-        location: extracted.location || formData.location,
-        area: extracted.area || formData.area,
-        type: extracted.type || formData.type,
-        maker: extracted.maker || formData.maker,
-        price: extracted.price || formData.price,
-        description: extracted.description || formData.description,
-        image_url: extracted.image_url || formData.image_url,
-        is_purchased: formData.is_purchased,
-      })
-    } catch (error) {
-      console.error('Error extracting event:', error)
-      setExtractionError(
-        error instanceof Error ? error.message : 'イベント情報の抽出に失敗しました'
-      )
-    } finally {
-      setIsExtracting(false)
-    }
-  }
+  useEffect(() => {
+    // イベントデータでフォームを初期化
+    setFormData({
+      title: event.title || '',
+      url: event.url || '',
+      image_url: event.image_url || '',
+      start_date: event.start_date || '',
+      end_date: event.end_date || '',
+      location: event.location || '',
+      area: event.area || '',
+      type: event.type || '',
+      maker: event.maker || '',
+      price: event.price || '',
+      description: event.description || '',
+      is_purchased: (event as any).is_purchased || false,
+    })
+  }, [event])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,26 +59,26 @@ export default function AddEventModal({ onClose }: AddEventModalProps) {
         return
       }
 
+      // 作成者のみ編集可能（RLSで保護されているが、念のため確認）
+      if (event.created_by !== user.id) {
+        alert('このイベントを編集する権限がありません')
+        return
+      }
+
       const { error } = await supabase
         .from('events')
-        .insert({
+        .update({
           ...formData,
-          created_by: user.id,
           end_date: formData.end_date || null,
-          is_purchased: formData.is_purchased || false,
         })
+        .eq('id', event.id)
 
       if (error) {
-        console.error('Error creating event:', error)
-        alert('イベントの登録に失敗しました')
+        console.error('Error updating event:', error)
+        alert('イベントの更新に失敗しました')
       } else {
-        // 紙吹雪エフェクト
-        triggerConfetti()
-        // 少し遅延してから閉じる（エフェクトを見せるため）
-        setTimeout(() => {
-          router.refresh()
-          onClose()
-        }, 500)
+        router.refresh()
+        onClose()
       }
     } catch (error) {
       console.error('Error:', error)
@@ -127,7 +93,7 @@ export default function AddEventModal({ onClose }: AddEventModalProps) {
       <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* ヘッダー */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-800">イベントを追加</h2>
+          <h2 className="text-2xl font-bold text-gray-800">イベントを編集</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -138,52 +104,6 @@ export default function AddEventModal({ onClose }: AddEventModalProps) {
 
         {/* フォーム */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* URL入力と自動抽出 */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              URL *
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="url"
-                required
-                value={formData.url}
-                onChange={(e) => {
-                  setFormData({ ...formData, url: e.target.value })
-                  setExtractionError(null)
-                }}
-                placeholder="https://example.com/event"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange"
-              />
-              <button
-                type="button"
-                onClick={handleExtractFromUrl}
-                disabled={isExtracting || !formData.url}
-                className="px-4 py-2 bg-mint-green text-gray-800 rounded-2xl font-semibold hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isExtracting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>抽出中...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>自動入力</span>
-                  </>
-                )}
-              </button>
-            </div>
-            {extractionError && (
-              <p className="mt-2 text-sm text-soft-coral">{extractionError}</p>
-            )}
-            {!extractionError && isExtracting && (
-              <p className="mt-2 text-sm text-gray-500">
-                AIがイベント情報を抽出しています...
-              </p>
-            )}
-          </div>
-
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               イベント名 *
@@ -193,6 +113,19 @@ export default function AddEventModal({ onClose }: AddEventModalProps) {
               required
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              URL *
+            </label>
+            <input
+              type="url"
+              required
+              value={formData.url}
+              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange"
             />
           </div>
@@ -329,9 +262,16 @@ export default function AddEventModal({ onClose }: AddEventModalProps) {
             <button
               type="submit"
               disabled={isLoading}
-              className="flex-1 px-6 py-3 bg-pastel-orange text-white rounded-2xl font-semibold hover:bg-opacity-90 transition-colors disabled:opacity-50"
+              className="flex-1 px-6 py-3 bg-pastel-orange text-white rounded-2xl font-semibold hover:bg-opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isLoading ? '登録中...' : '登録する'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>更新中...</span>
+                </>
+              ) : (
+                '更新する'
+              )}
             </button>
           </div>
         </form>

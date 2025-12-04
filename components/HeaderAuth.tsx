@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import AddEventButton from './AddEventButton'
 import LogoutButton from './LogoutButton'
+import ColorPalette from './ColorPalette'
 import Link from 'next/link'
 
 export default function HeaderAuth() {
@@ -36,22 +37,23 @@ export default function HeaderAuth() {
     )
   }
 
-  if (user) {
-    return (
-      <>
-        <AddEventButton />
-        <LogoutButton />
-      </>
-    )
-  }
-
   return (
-    <Link
-      href="/auth"
-      className="px-3 sm:px-4 py-2 bg-pastel-orange text-white rounded-2xl text-sm sm:text-base font-semibold hover:bg-opacity-90 transition-colors"
-    >
-      ログイン
-    </Link>
+    <div className="flex items-center gap-2 sm:gap-3">
+      <ColorPalette />
+      {user ? (
+        <>
+          <AddEventButton />
+          <LogoutButton />
+        </>
+      ) : (
+        <Link
+          href="/auth"
+          className="px-3 sm:px-4 py-2 bg-pastel-orange text-white rounded-2xl text-sm sm:text-base font-semibold hover:bg-opacity-90 transition-colors"
+        >
+          ログイン
+        </Link>
+      )}
+    </div>
   )
 }
 
