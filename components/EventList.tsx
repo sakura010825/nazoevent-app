@@ -21,7 +21,7 @@ export default function EventList({ events: initialEvents }: EventListProps) {
   const [areaFilter, setAreaFilter] = useState<string | null>(null)
   const [sortOption, setSortOption] = useState<SortOption>('event_date_asc')
 
-  // フィルター適用
+  // フィルター適用とソート
   const filteredEvents = useMemo(() => {
     let filtered = initialEvents.filter((event) => {
       if (filter === 'favorite' && (!event.isFavorite && event.favorite_count === 0)) {
@@ -90,68 +90,69 @@ export default function EventList({ events: initialEvents }: EventListProps) {
             <span className="text-sm sm:text-base font-semibold text-gray-700">フィルター</span>
           </div>
         
-        {/* ステータスフィルター */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-pastel-orange text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            すべて
-          </button>
-          <button
-            onClick={() => setFilter('favorite')}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-              filter === 'favorite'
-                ? 'bg-pastel-orange text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            お気に入り❤️
-          </button>
-          <button
-            onClick={() => setFilter('ongoing')}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-              filter === 'ongoing'
-                ? 'bg-pastel-orange text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            開催中
-          </button>
-        </div>
-
-        {/* エリアフィルター */}
-        {areas.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          {/* ステータスフィルター */}
+          <div className="flex flex-wrap gap-2 mb-3">
             <button
-              onClick={() => setAreaFilter(null)}
+              onClick={() => setFilter('all')}
               className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-                areaFilter === null
-                  ? 'bg-mint-green text-gray-800'
+                filter === 'all'
+                  ? 'bg-pastel-orange text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              すべてのエリア
+              すべて
             </button>
-            {areas.map((area) => (
+            <button
+              onClick={() => setFilter('favorite')}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
+                filter === 'favorite'
+                  ? 'bg-pastel-orange text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              お気に入り❤️
+            </button>
+            <button
+              onClick={() => setFilter('ongoing')}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
+                filter === 'ongoing'
+                  ? 'bg-pastel-orange text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              開催中
+            </button>
+          </div>
+
+          {/* エリアフィルター */}
+          {areas.length > 0 && (
+            <div className="flex flex-wrap gap-2">
               <button
-                key={area}
-                onClick={() => setAreaFilter(area)}
+                onClick={() => setAreaFilter(null)}
                 className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-                  areaFilter === area
+                  areaFilter === null
                     ? 'bg-mint-green text-gray-800'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {area}
+                すべてのエリア
               </button>
-            ))}
-          </div>
-        )}
+              {areas.map((area) => (
+                <button
+                  key={area}
+                  onClick={() => setAreaFilter(area)}
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
+                    areaFilter === area
+                      ? 'bg-mint-green text-gray-800'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {area}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* イベントカード一覧 */}
@@ -172,4 +173,3 @@ export default function EventList({ events: initialEvents }: EventListProps) {
     </div>
   )
 }
-

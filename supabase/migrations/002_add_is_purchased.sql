@@ -5,8 +5,10 @@ ADD COLUMN IF NOT EXISTS is_purchased BOOLEAN DEFAULT FALSE;
 -- インデックス作成（購入済みフィルター用）
 CREATE INDEX IF NOT EXISTS idx_events_is_purchased ON public.events(is_purchased);
 
--- events_with_stats ビューを更新して is_purchased を含める
-CREATE OR REPLACE VIEW public.events_with_stats AS
+-- events_with_stats ビューを削除してから再作成（is_purchased を含める）
+DROP VIEW IF EXISTS public.events_with_stats;
+
+CREATE VIEW public.events_with_stats AS
 SELECT 
     e.*,
     COUNT(DISTINCT CASE WHEN uel.status = 'FAVORITE' THEN uel.user_id END) AS favorite_count,
