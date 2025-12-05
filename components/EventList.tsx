@@ -15,6 +15,8 @@ type SortOption =
   | 'event_date_asc' 
   | 'event_date_desc' 
   | 'title_asc'
+  | 'end_date_asc'
+  | 'end_date_desc'
 
 export default function EventList({ events: initialEvents }: EventListProps) {
   const [filter, setFilter] = useState<'all' | 'favorite' | 'ongoing'>('all')
@@ -49,6 +51,18 @@ export default function EventList({ events: initialEvents }: EventListProps) {
           return new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
         case 'title_asc':
           return a.title.localeCompare(b.title, 'ja')
+        case 'end_date_asc':
+          // 終了日が近い順：日付の昇順、未設定（null）は最後
+          if (a.end_date === null && b.end_date === null) return 0
+          if (a.end_date === null) return 1 // aがnullなら後ろに
+          if (b.end_date === null) return -1 // bがnullなら後ろに
+          return new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
+        case 'end_date_desc':
+          // 終了日が遠い順：日付の降順、未設定（null）は最初（無限の未来として扱う）
+          if (a.end_date === null && b.end_date === null) return 0
+          if (a.end_date === null) return -1 // aがnullなら前に
+          if (b.end_date === null) return 1 // bがnullなら前に
+          return new Date(b.end_date).getTime() - new Date(a.end_date).getTime()
         default:
           return 0
       }
@@ -75,11 +89,13 @@ export default function EventList({ events: initialEvents }: EventListProps) {
             onChange={(e) => setSortOption(e.target.value as SortOption)}
             className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange text-sm sm:text-base"
           >
-            <option value="event_date_asc">イベント日（近い順）</option>
-            <option value="event_date_desc">イベント日（遠い順）</option>
             <option value="created_desc">作成日（新しい順）</option>
             <option value="created_asc">作成日（古い順）</option>
+            <option value="event_date_asc">イベント日（近い順）</option>
+            <option value="event_date_desc">イベント日（遠い順）</option>
             <option value="title_asc">タイトル（五十音順）</option>
+            <option value="end_date_asc">イベント終了日（近い順）</option>
+            <option value="end_date_desc">イベント終了日（遠い順）</option>
           </select>
         </div>
 
