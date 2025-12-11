@@ -1,7 +1,7 @@
 'use client'
 
 import { EventCard } from '@/types/event'
-import { Heart, MapPin, Calendar, Flag, Edit, Trash2, PawPrint } from 'lucide-react'
+import { Heart, MapPin, Calendar, Flag, Edit, Trash2, PawPrint, Clock } from 'lucide-react'
 import { getStatusBadge, formatDateRange } from '@/lib/utils/event'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -81,7 +81,7 @@ export default function EventCardComponent({ event }: EventCardProps) {
   return (
     <>
       <Link href={`/events/${event.id}`} className="block">
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
+        <div className="bg-white rounded-3xl shadow-soft-md overflow-hidden hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
           {/* 画像 */}
           <div className="relative h-48 bg-gray-200 overflow-hidden">
         {event.image_url ? (
@@ -92,16 +92,35 @@ export default function EventCardComponent({ event }: EventCardProps) {
             onError={(e) => {
               const target = e.target as HTMLImageElement
               target.style.display = 'none'
+              const parent = target.parentElement
+              if (parent && !parent.querySelector('.fallback-image')) {
+                const fallback = document.createElement('div')
+                fallback.className = 'fallback-image w-full h-full flex items-center justify-center bg-gradient-to-br from-pastel-orange via-pink-200 to-mint-green'
+                fallback.innerHTML = '<div class="text-center"><div class="text-white text-4xl mb-1">🔍</div><div class="text-white text-sm font-bold">謎解き</div></div>'
+                parent.appendChild(fallback)
+              }
             }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pastel-orange to-mint-green">
-            <span className="text-white text-2xl font-bold">?</span>
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pastel-orange via-pink-200 to-mint-green">
+            <div className="text-center">
+              <div className="text-white text-4xl mb-1">🔍</div>
+              <div className="text-white text-sm font-bold">謎解き</div>
+            </div>
+          </div>
+        )}
+
+        {/* 購入済みマーク（肉球） */}
+        {(event as any).is_purchased && (
+          <div className="absolute top-2 right-2 z-10 transform rotate-12 hover:rotate-6 hover:scale-110 transition-all duration-300 hover:animate-bounce">
+            <div className="bg-gradient-to-br from-orange-400 via-pink-400 to-orange-500 p-2.5 rounded-full shadow-lg">
+              <PawPrint className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+            </div>
           </div>
         )}
 
         {/* ステータスバッジ */}
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 left-3">
           <div
             className={`px-3 py-1 rounded-2xl text-xs font-semibold bg-${statusBadge.color} bg-opacity-90 text-white shadow-md`}
           >
@@ -132,9 +151,6 @@ export default function EventCardComponent({ event }: EventCardProps) {
           <h3 className="text-lg sm:text-xl font-bold text-gray-800 line-clamp-2 flex-1">
             {event.title}
           </h3>
-          {(event as any).is_purchased && (
-            <PawPrint className="w-5 h-5 sm:w-6 sm:h-6 text-black flex-shrink-0" />
-          )}
         </div>
 
         {/* 情報 */}
@@ -154,6 +170,15 @@ export default function EventCardComponent({ event }: EventCardProps) {
           {event.price && (
             <div className="flex items-center gap-2">
               <span className="font-semibold text-pastel-orange">{event.price}</span>
+            </div>
+          )}
+
+          {(event as any).duration_text && (
+            <div className="flex items-center gap-2">
+              <div className="bg-gray-100 text-gray-700 rounded-full px-3 py-1 text-sm flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{(event as any).duration_text}</span>
+              </div>
             </div>
           )}
         </div>
@@ -184,8 +209,8 @@ export default function EventCardComponent({ event }: EventCardProps) {
             <span>行った🚩</span>
           </button>
 
-          {/* 作成者のみ編集・削除ボタンを表示 */}
-          {currentUser && event.created_by === currentUser.id && (
+          {/* ログインユーザーは編集・削除ボタンを表示 */}
+          {currentUser && (
             <div className="flex gap-2">
               <button
                 onClick={async (e) => {

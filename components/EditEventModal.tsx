@@ -27,6 +27,7 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
     maker: event.maker || '',
     price: event.price || '',
     description: event.description || '',
+    duration_text: (event as any).duration_text || '',
     is_purchased: (event as any).is_purchased || false,
   })
 
@@ -44,6 +45,7 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
       maker: event.maker || '',
       price: event.price || '',
       description: event.description || '',
+      duration_text: (event as any).duration_text || '',
       is_purchased: (event as any).is_purchased || false,
     })
   }, [event])
@@ -59,11 +61,7 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
         return
       }
 
-      // 作成者のみ編集可能（RLSで保護されているが、念のため確認）
-      if (event.created_by !== user.id) {
-        alert('このイベントを編集する権限がありません')
-        return
-      }
+      // 認証済みユーザーは誰でも編集可能（RLSで保護されている）
 
       const { error } = await supabase
         .from('events')
@@ -90,7 +88,7 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-soft-lg">
         {/* ヘッダー */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-800">イベントを編集</h2>
@@ -208,6 +206,19 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
               value={formData.price}
               onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               placeholder="例: 3,500円"
+              className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              所要時間
+            </label>
+            <input
+              type="text"
+              value={formData.duration_text}
+              onChange={(e) => setFormData({ ...formData, duration_text: e.target.value })}
+              placeholder="例: 90分、2時間、60-90分"
               className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange"
             />
           </div>

@@ -23,6 +23,7 @@ export interface Database {
           maker: string | null
           price: string | null
           description: string | null
+          duration_text: string | null
           created_by: string
           created_at: string
           updated_at: string
@@ -41,6 +42,7 @@ export interface Database {
           maker?: string | null
           price?: string | null
           description?: string | null
+          duration_text?: string | null
           created_by: string
           created_at?: string
           updated_at?: string
@@ -59,6 +61,7 @@ export interface Database {
           maker?: string | null
           price?: string | null
           description?: string | null
+          duration_text?: string | null
           created_by?: string
           created_at?: string
           updated_at?: string
@@ -113,6 +116,7 @@ export interface Database {
           maker: string | null
           price: string | null
           description: string | null
+          duration_text: string | null
           created_by: string
           created_at: string
           updated_at: string

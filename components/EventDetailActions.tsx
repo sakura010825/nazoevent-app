@@ -23,8 +23,8 @@ export default function EventDetailActions({ event }: EventDetailActionsProps) {
     })
   }, [supabase])
 
-  // 作成者のみ編集・削除ボタンを表示
-  if (!currentUser || event.created_by !== currentUser.id) {
+  // ログインユーザーは編集・削除ボタンを表示
+  if (!currentUser) {
     return null
   }
 

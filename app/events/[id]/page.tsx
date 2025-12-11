@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { MapPin, Calendar, ExternalLink, ArrowLeft, PawPrint } from 'lucide-react'
+import { MapPin, Calendar, ExternalLink, ArrowLeft, PawPrint, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { formatDateRange } from '@/lib/utils/event'
 import HeaderAuth from '@/components/HeaderAuth'
@@ -64,13 +64,17 @@ export default async function EventDetailPage({ params }: PageProps) {
           </div>
 
           {/* イベント情報 */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md p-6 sm:p-8">
+          <div className="bg-white rounded-3xl shadow-soft-md p-6 sm:p-8">
             <div className="flex items-start gap-3 mb-6">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex-1">
                 {event.title}
               </h1>
               {(event as any).is_purchased && (
-                <PawPrint className="w-8 h-8 text-black flex-shrink-0" />
+                <div className="transform rotate-12 hover:rotate-6 hover:scale-110 transition-all duration-300 hover:animate-bounce">
+                  <div className="bg-gradient-to-br from-orange-400 via-pink-400 to-orange-500 p-3 rounded-full shadow-lg">
+                    <PawPrint className="w-8 h-8 text-white" />
+                  </div>
+                </div>
               )}
             </div>
 
@@ -130,6 +134,16 @@ export default async function EventDetailPage({ params }: PageProps) {
                   <div>
                     <div className="text-sm text-gray-500 mb-1">価格</div>
                     <div className="text-lg font-semibold text-pastel-orange">{event.price}</div>
+                  </div>
+                </div>
+              )}
+
+              {(event as any).duration_text && (
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">所要時間</div>
+                    <div className="text-gray-800">{(event as any).duration_text}</div>
                   </div>
                 </div>
               )}

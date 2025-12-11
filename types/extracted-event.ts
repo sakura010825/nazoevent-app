@@ -14,6 +14,7 @@ export const ExtractedEventSchema = z.object({
   maker: z.string().nullable().describe('制作団体・主催者（例: SCRAP、NAZO）'),
   price: z.string().nullable().describe('価格情報（例: 3,500円、要予約）'),
   description: z.string().nullable().describe('ストーリー概要・説明'),
+  duration_text: z.string().nullable().describe('所要時間（例: 90分、2時間、60-90分）'),
   image_url: z.string().url().nullable().describe('メインビジュアル画像のURL'),
 })
 

@@ -21,7 +21,7 @@ type SortOption =
 export default function EventList({ events: initialEvents }: EventListProps) {
   const [filter, setFilter] = useState<'all' | 'favorite' | 'ongoing'>('all')
   const [areaFilter, setAreaFilter] = useState<string | null>(null)
-  const [sortOption, setSortOption] = useState<SortOption>('event_date_asc')
+  const [sortOption, setSortOption] = useState<SortOption>('end_date_asc')
 
   // フィルター適用とソート
   const filteredEvents = useMemo(() => {
@@ -77,7 +77,7 @@ export default function EventList({ events: initialEvents }: EventListProps) {
   return (
     <div className="space-y-6">
       {/* ソート・フィルターバー */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-sm">
+      <div className="bg-white rounded-3xl p-3 sm:p-4 shadow-soft">
         {/* ソート */}
         <div className="mb-4 pb-4 border-b border-gray-200">
           <div className="flex items-center gap-2 mb-2">
