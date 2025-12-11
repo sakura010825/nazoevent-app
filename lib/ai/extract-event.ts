@@ -161,6 +161,7 @@ ${text}
 - maker: 制作団体・主催者（例: SCRAP、NAZO）
 - price: 価格情報（例: 3,500円、要予約）
 - description: ストーリー概要・説明
+- duration_text: 所要時間（例: 90分、2時間、60-90分。不明な場合はnull）
 - image_url: メインビジュアル画像のURL（完全なURL形式）
 
 JSON形式で返してください。他の説明は不要です。
@@ -202,6 +203,11 @@ JSON形式で返してください。他の説明は不要です。
       if (!parsed.title || parsed.title === null) {
         parsed.title = 'イベント名不明'
         console.warn('title was null, using default value')
+      }
+      
+      // duration_textが存在しない場合はnullを設定
+      if (!('duration_text' in parsed)) {
+        parsed.duration_text = null
       }
       
       // image_urlがnullまたは相対パスの場合、抽出した画像URLを使用
