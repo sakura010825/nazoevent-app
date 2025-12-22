@@ -19,7 +19,7 @@ type SortOption =
   | 'end_date_desc'
 
 export default function EventList({ events: initialEvents }: EventListProps) {
-  const [filter, setFilter] = useState<'all' | 'favorite' | 'ongoing'>('all')
+  const [filter, setFilter] = useState<'all' | 'favorite' | 'ongoing' | 'purchased'>('all')
   const [areaFilter, setAreaFilter] = useState<string | null>(null)
   const [sortOption, setSortOption] = useState<SortOption>('end_date_asc')
 
@@ -30,6 +30,9 @@ export default function EventList({ events: initialEvents }: EventListProps) {
         return false
       }
       if (filter === 'ongoing' && event.current_status !== '開催中') {
+        return false
+      }
+      if (filter === 'purchased' && !(event as any).is_purchased) {
         return false
       }
       if (areaFilter && event.area !== areaFilter) {
@@ -137,6 +140,16 @@ export default function EventList({ events: initialEvents }: EventListProps) {
               }`}
             >
               開催中
+            </button>
+            <button
+              onClick={() => setFilter('purchased')}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
+                filter === 'purchased'
+                  ? 'bg-pastel-orange text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              チケット購入済み🐾
             </button>
           </div>
 
