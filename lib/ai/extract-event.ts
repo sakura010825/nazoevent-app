@@ -12,55 +12,51 @@ if (!GEMINI_API_KEY) {
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null
 
 /**
- * URLからHTMLを取得してテキストと画像URLを抽出
+ * URLからテキスト（Markdown）と画像URLを抽出
+ * Jina Reader を利用して、JSレンダリングサイトにも強いテキスト抽出を行う
  */
 async function fetchAndExtractText(url: string): Promise<{ text: string; imageUrl: string | null }> {
   try {
-    const response = await fetch(url, {
+    // Jina Reader 経由でコンテンツを取得
+    const jinaUrl = `https://r.jina.ai/${url}`
+
+    const response = await fetch(jinaUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
     })
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`Jina Reader経由での取得に失敗しました (status: ${response.status})`)
     }
 
-    const html = await response.text()
-    const $ = load(html)
-    
-    // ベースURLを取得（相対パスを絶対URLに変換するため）
-    const baseUrl = new URL(url)
-    
-    // 画像URLを抽出（og:image、メイン画像、最初の画像の順で試行）
-    let imageUrl: string | null = null
-    
-    // og:imageを確認
-    const ogImage = $('meta[property="og:image"]').attr('content')
-    if (ogImage) {
-      imageUrl = ogImage.startsWith('http') ? ogImage : new URL(ogImage, baseUrl).href
-    }
-    
-    // og:imageがない場合、メイン画像を探す
-    if (!imageUrl) {
-      const mainImage = $('img').first().attr('src')
-      if (mainImage) {
-        imageUrl = mainImage.startsWith('http') ? mainImage : new URL(mainImage, baseUrl).href
-      }
-    }
-    
-    // 不要な要素を削除
-    $('script, style, nav, footer, header').remove()
-    
-    // メインコンテンツを抽出
-    const text = $('body').text()
+    const markdown = await response.text()
+
+    const text = markdown
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 10000) // 長すぎる場合は切り詰め
-    
+
+    // テキストが極端に短い場合は、元サイト側でブロックされている可能性を示す
+    if (text.length < 200) {
+      throw new Error(
+        'Jina Reader経由で取得できるテキストが非常に短いため、元サイトによってブロックされている可能性があります。URLを確認するか、別のページでお試しください。'
+      )
+    }
+
+    // 画像URLはMarkdown中の最初の画像（![]()）があれば利用する
+    let imageUrl: string | null = null
+    const imageMatch = markdown.match(/!\[[^\]]*]\((https?:\/\/[^\s)]+)\)/)
+    if (imageMatch && imageMatch[1]) {
+      imageUrl = imageMatch[1]
+    }
+
     return { text, imageUrl }
   } catch (error) {
-    console.error('Error fetching URL:', error)
+    console.error('Error fetching URL via Jina Reader:', error)
+    if (error instanceof Error) {
+      throw error
+    }
     throw new Error('URLから情報を取得できませんでした')
   }
 }
@@ -140,32 +136,28 @@ export async function extractEventFromUrl(url: string): Promise<ExtractedEvent> 
   }
 
   const prompt = `
-以下のWebページのテキストから、謎解きイベントの情報を抽出してください。
+あなたは謎解きイベントの情報抽出の専門家です。
+提供されたテキストから、イベント情報を正確にJSONで抽出してください。
 
 URL: ${url}
 
 テキスト:
 ${text}
 
-以下のJSON形式で情報を抽出してください。
+【抽出ルール】
+1. title: 最も大きく扱われているイベント名を抽出してください。「チケット購入」などのボタンの文字と混同しないでください。
+2. start_date / end_date: 
+   - 「2024年4月1日〜5月31日」のような表記から日付を特定してください。
+   - 年が省略されている場合は、現在の年（2026年）または文脈から判断してください。
+3. price: 「前売 3,500円」「当日 4,000円」など、価格体系がわかるように抽出してください。
+4. duration_text: 「100分」「約2時間」などの所要時間を抽出してください。
+5. type: 以下のいずれかに分類してください：[周遊型, ホール型, ルーム型, オンライン, 持ち帰り謎, その他]
+6. description: イベントの世界観やストーリー、どんな謎解きかを100文字程度で要約してください。
 
-【重要】必須項目について：
-- title: イベント名・タイトル（必須、必ず文字列を返すこと。nullは不可）
-- start_date: 開始日（必須、YYYY-MM-DD形式で必ず文字列を返すこと。日付が不明な場合は、今日の日付または適切な推定日付を返すこと。nullは不可）
-
-【任意項目】不明な場合はnullにしてください：
-- end_date: 終了日（YYYY-MM-DD形式、常設の場合はnull）
-- location: 開催場所・集合場所
-- area: 都道府県・主要エリア（例: 東京、神奈川、関西）
-- type: イベントタイプ（周遊型、ホール、ルーム、オンラインのいずれか、またはnull）
-- maker: 制作団体・主催者（例: SCRAP、NAZO）
-- price: 価格情報（例: 3,500円、要予約）
-- description: ストーリー概要・説明
-- duration_text: 所要時間（例: 90分、2時間、60-90分。不明な場合はnull）
-- image_url: メインビジュアル画像のURL（完全なURL形式）
-
-JSON形式で返してください。他の説明は不要です。
-必ずtitleとstart_dateは文字列として返してください。
+【注意】
+- 出力は必ず純粋なJSONのみとしてください。
+- テキスト内に情報がない項目は null にしてください。
+- 日本語で回答してください。
 `
 
   // 複数のモデル名を試行（利用可能なものを自動検出）
