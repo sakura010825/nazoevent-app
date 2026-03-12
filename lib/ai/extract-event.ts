@@ -12,12 +12,15 @@ if (!GEMINI_API_KEY) {
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null
 
 /**
- * URLからテキスト（Markdown）と画像URLを抽出
- * Jina Reader を利用して、JSレンダリングサイトにも強いテキスト抽出を行う
+ * URLからテキストと画像URLを抽出
+ * 1. Jina Reader（Markdown）で取得を試みる
+ * 2. 失敗/短すぎる場合は通常のHTML取得＋cheerioでフォールバック
  */
 async function fetchAndExtractText(url: string): Promise<{ text: string; imageUrl: string | null }> {
+  let lastError: unknown = null
+
+  // 1. Jina Reader 経由の取得を試行
   try {
-    // Jina Reader 経由でコンテンツを取得
     const jinaUrl = `https://r.jina.ai/${url}`
 
     const response = await fetch(jinaUrl, {
@@ -25,7 +28,7 @@ async function fetchAndExtractText(url: string): Promise<{ text: string; imageUr
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
     })
-    
+
     if (!response.ok) {
       throw new Error(`Jina Reader経由での取得に失敗しました (status: ${response.status})`)
     }
@@ -37,27 +40,78 @@ async function fetchAndExtractText(url: string): Promise<{ text: string; imageUr
       .trim()
       .slice(0, 10000) // 長すぎる場合は切り詰め
 
-    // テキストが極端に短い場合は、元サイト側でブロックされている可能性を示す
-    if (text.length < 200) {
-      throw new Error(
-        'Jina Reader経由で取得できるテキストが非常に短いため、元サイトによってブロックされている可能性があります。URLを確認するか、別のページでお試しください。'
+    // テキストが極端に短い場合は、フォールバックに切り替える
+    if (text.length >= 200) {
+      // 画像URLはMarkdown中の最初の画像（![]()）があれば利用する
+      let imageUrl: string | null = null
+      const imageMatch = markdown.match(/!\[[^\]]*]\((https?:\/\/[^\s)]+)\)/)
+      if (imageMatch && imageMatch[1]) {
+        imageUrl = imageMatch[1]
+      }
+
+      return { text, imageUrl }
+    } else {
+      lastError = new Error(
+        'Jina Reader経由で取得できるテキストが非常に短いため、フォールバック処理に切り替えました。'
       )
+      console.warn(lastError)
+    }
+  } catch (error) {
+    lastError = error
+    console.warn('Error fetching URL via Jina Reader, falling back to direct fetch:', error)
+  }
+
+  // 2. 通常のHTML取得＋cheerioを使ったフォールバック
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`直接取得に失敗しました (status: ${response.status})`)
     }
 
-    // 画像URLはMarkdown中の最初の画像（![]()）があれば利用する
+    const html = await response.text()
+    const $ = load(html)
+
+    // ベースURLを取得（相対パスを絶対URLに変換するため）
+    const baseUrl = new URL(url)
+
+    // 画像URLを抽出（og:image、メイン画像、最初の画像の順で試行）
     let imageUrl: string | null = null
-    const imageMatch = markdown.match(/!\[[^\]]*]\((https?:\/\/[^\s)]+)\)/)
-    if (imageMatch && imageMatch[1]) {
-      imageUrl = imageMatch[1]
+
+    const ogImage = $('meta[property="og:image"]').attr('content')
+    if (ogImage) {
+      imageUrl = ogImage.startsWith('http') ? ogImage : new URL(ogImage, baseUrl).href
+    }
+
+    if (!imageUrl) {
+      const mainImage = $('img').first().attr('src')
+      if (mainImage) {
+        imageUrl = mainImage.startsWith('http') ? mainImage : new URL(mainImage, baseUrl).href
+      }
+    }
+
+    // 不要な要素を削除
+    $('script, style, nav, footer, header').remove()
+
+    // メインコンテンツを抽出
+    const text = $('body')
+      .text()
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 10000)
+
+    if (!text || text.length === 0) {
+      throw new Error('HTMLから有効なテキストを抽出できませんでした')
     }
 
     return { text, imageUrl }
   } catch (error) {
-    console.error('Error fetching URL via Jina Reader:', error)
-    if (error instanceof Error) {
-      throw error
-    }
-    throw new Error('URLから情報を取得できませんでした')
+    console.error('Error fetching URL directly after Jina Reader failed:', error, 'First error:', lastError)
+    throw new Error('サイトの制限により自動入力が制限されました。手動で補完してください。')
   }
 }
 
@@ -156,7 +210,8 @@ ${text}
 
 【注意】
 - 出力は必ず純粋なJSONのみとしてください。
-- テキスト内に情報がない項目は null にしてください。
+- テキスト内に情報がない項目は必ず null にしてください。推測しすぎないでください。
+- テキスト量が少ない場合でも、分からない項目は必ず null を設定し、存在しないフィールドを勝手に作らないでください。
 - 日本語で回答してください。
 `
 
