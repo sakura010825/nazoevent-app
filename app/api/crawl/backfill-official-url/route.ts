@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
     .limit(20) as { data: { id: string; url: string }[] | null; error: unknown }
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const msg = error instanceof Error ? error.message : String(error)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 
   if (!events || events.length === 0) {
