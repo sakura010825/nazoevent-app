@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     .select('id, url')
     .like('url', '%nazohiroba.com%')
     .is('official_url', null)
-    .limit(20)
+    .limit(20) as { data: { id: string; url: string }[] | null; error: unknown }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
