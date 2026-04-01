@@ -37,7 +37,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'SYSTEM_USER_ID が設定されていません' }, { status: 500 })
   }
 
-  const supabase = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createAdminClient() as any
   const results = {
     collected: 0,
     skipped: 0,
