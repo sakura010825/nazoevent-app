@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       throw new Error(`既存イベント取得エラー: ${fetchError.message}`)
     }
 
-    const existingUrls = new Set((existingEvents || []).map((e) => e.url))
+    const existingUrls = new Set((existingEvents || []).map((e: { url: string }) => e.url))
 
     // 3. 新着URLのみ抽出（1回の実行上限を適用）
     const allNewUrls = collectedUrls.filter((url) => !existingUrls.has(url))
