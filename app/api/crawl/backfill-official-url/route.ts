@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
   }
 
-  const supabase = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createAdminClient() as any
   const results = { updated: 0, skipped: 0, failed: 0 }
 
   // official_url が未設定でナゾヒロバURLのイベントを取得（20件ずつ処理）
@@ -28,18 +29,17 @@ export async function GET(request: NextRequest) {
     .select('id, url')
     .like('url', '%nazohiroba.com%')
     .is('official_url', null)
-    .limit(20) as { data: { id: string; url: string }[] | null; error: unknown }
+    .limit(20)
 
   if (error) {
-    const msg = error instanceof Error ? error.message : String(error)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({ error: String(error.message ?? error) }, { status: 500 })
   }
 
   if (!events || events.length === 0) {
     return NextResponse.json({ success: true, message: '補完対象なし', results })
   }
 
-  for (const event of events) {
+  for (const event of events as { id: string; url: string }[]) {
     try {
       const officialUrl = await fetchOfficialUrl(event.url)
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
         .update({ official_url: officialUrl })
         .eq('id', event.id)
 
-      if (updateError) throw new Error(updateError.message)
+      if (updateError) throw new Error(String(updateError.message ?? updateError))
 
       results.updated++
       console.log(`[backfill] 更新完了: ${officialUrl}`)
