@@ -235,9 +235,26 @@ ${text}
 
       // JSONをパース
       const parsed = JSON.parse(jsonText)
-      
+
+      // 日本語形式の日付（"2026年4月8日"）をYYYY-MM-DD形式に変換するヘルパー
+      const normalizeDate = (val: unknown): string | null => {
+        if (!val || typeof val !== 'string') return null
+        // すでにYYYY-MM-DD形式ならそのまま
+        if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val
+        // "YYYY年M月D日" 形式を変換
+        const m = val.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/)
+        if (m) {
+          return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
+        }
+        return val
+      }
+
+      // 日付フィールドを正規化
+      parsed.start_date = normalizeDate(parsed.start_date)
+      parsed.end_date = normalizeDate(parsed.end_date)
+
       // start_dateがnullの場合は、今日の日付をデフォルト値として設定
-      if (!parsed.start_date || parsed.start_date === null) {
+      if (!parsed.start_date) {
         const today = new Date()
         const year = today.getFullYear()
         const month = String(today.getMonth() + 1).padStart(2, '0')
@@ -245,13 +262,19 @@ ${text}
         parsed.start_date = `${year}-${month}-${day}`
         console.warn('start_date was null, using today\'s date as default:', parsed.start_date)
       }
-      
+
       // titleがnullの場合は、URLから推測
       if (!parsed.title || parsed.title === null) {
         parsed.title = 'イベント名不明'
         console.warn('title was null, using default value')
       }
-      
+
+      // typeが配列で返ってきた場合は先頭の文字列を使用
+      if (Array.isArray(parsed.type)) {
+        parsed.type = parsed.type[0] ?? null
+        console.warn('type was array, using first element:', parsed.type)
+      }
+
       // duration_textが存在しない場合はnullを設定
       if (!('duration_text' in parsed)) {
         parsed.duration_text = null

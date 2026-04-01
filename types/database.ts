@@ -14,6 +14,7 @@ export interface Database {
           id: string
           title: string
           url: string
+          official_url: string | null
           image_url: string | null
           start_date: string
           end_date: string | null
@@ -33,6 +34,7 @@ export interface Database {
           id?: string
           title: string
           url: string
+          official_url?: string | null
           image_url?: string | null
           start_date: string
           end_date?: string | null
@@ -52,6 +54,7 @@ export interface Database {
           id?: string
           title?: string
           url?: string
+          official_url?: string | null
           image_url?: string | null
           start_date?: string
           end_date?: string | null
@@ -107,6 +110,7 @@ export interface Database {
           id: string
           title: string
           url: string
+          official_url: string | null
           image_url: string | null
           start_date: string
           end_date: string | null
