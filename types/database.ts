@@ -29,6 +29,7 @@ export interface Database {
           created_at: string
           updated_at: string
           is_purchased: boolean
+          is_deleted: boolean
         }
         Insert: {
           id?: string
@@ -49,6 +50,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           is_purchased?: boolean
+          is_deleted?: boolean
         }
         Update: {
           id?: string
@@ -69,6 +71,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           is_purchased?: boolean
+          is_deleted?: boolean
         }
       }
       user_event_logs: {
@@ -125,6 +128,7 @@ export interface Database {
           created_at: string
           updated_at: string
           is_purchased: boolean
+          is_deleted: boolean
           favorite_count: number
           went_count: number
           current_status: string

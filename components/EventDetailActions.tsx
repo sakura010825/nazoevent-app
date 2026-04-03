@@ -47,7 +47,7 @@ export default function EventDetailActions({ event }: EventDetailActionsProps) {
               setIsDeleting(true)
               const { error } = await supabase
                 .from('events')
-                .delete()
+                .update({ is_deleted: true } as any)
                 .eq('id', event.id)
 
               if (error) {

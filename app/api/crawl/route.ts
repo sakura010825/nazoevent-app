@@ -52,15 +52,16 @@ export async function GET(request: NextRequest) {
     const collectedItems = await collectAllEventUrls()
     results.collected = collectedItems.length
 
-    // 2. すでにDBに登録済みのURLを取得
+    // 2. すでにDBに登録済みのURL（論理削除済み含む）を取得
     const { data: existingEvents, error: fetchError } = await supabase
       .from('events')
-      .select('url')
+      .select('url, is_deleted')
 
     if (fetchError) {
       throw new Error(`既存イベント取得エラー: ${fetchError.message}`)
     }
 
+    // 登録済みURL（論理削除済みも含めてスキップ対象）
     const existingUrls = new Set((existingEvents || []).map((e: { url: string }) => e.url))
 
     // 3. 新着URLのみ抽出（1回の実行上限を適用）
