@@ -19,6 +19,7 @@ export default function EventCardComponent({ event }: EventCardProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [showLogModal, setShowLogModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const supabase = createClient()
   const router = useRouter()
@@ -38,7 +39,7 @@ export default function EventCardComponent({ event }: EventCardProps) {
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
+
     if (isLoading) return
 
     setIsLoading(true)
@@ -52,23 +53,23 @@ export default function EventCardComponent({ event }: EventCardProps) {
 
     try {
       if (isFavorite) {
-        // お気に入りを削除
-        await supabase
+        const { error } = await supabase
           .from('user_event_logs')
           .delete()
           .eq('user_id', user.id)
           .eq('event_id', event.id)
           .eq('status', 'FAVORITE')
+        if (error) throw error
         setIsFavorite(false)
       } else {
-        // お気に入りを追加
-        await supabase
+        const { error } = await supabase
           .from('user_event_logs')
           .upsert({
             user_id: user.id,
             event_id: event.id,
             status: 'FAVORITE',
           })
+        if (error) throw error
         setIsFavorite(true)
       }
     } catch (error) {
@@ -227,9 +228,12 @@ export default function EventCardComponent({ event }: EventCardProps) {
                 <span>編集</span>
               </button>
               <button
+                disabled={isDeleting}
                 onClick={async (e) => {
                   e.preventDefault()
                   e.stopPropagation()
+                  if (isDeleting) return
+
                   const { data: { user } } = await supabase.auth.getUser()
                   if (!user) {
                     alert('ログインが必要です')
@@ -237,6 +241,7 @@ export default function EventCardComponent({ event }: EventCardProps) {
                   }
 
                   if (window.confirm('このイベントを削除してもよろしいですか？')) {
+                    setIsDeleting(true)
                     const { error } = await supabase
                       .from('events')
                       .delete()
@@ -245,12 +250,13 @@ export default function EventCardComponent({ event }: EventCardProps) {
                     if (error) {
                       console.error('Error deleting event:', error)
                       alert('イベントの削除に失敗しました')
+                      setIsDeleting(false)
                     } else {
                       router.refresh()
                     }
                   }
                 }}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-xl font-semibold hover:bg-red-200 transition-colors text-sm"
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-xl font-semibold hover:bg-red-200 transition-colors text-sm ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Trash2 className="w-4 h-4" />
                 <span>削除</span>

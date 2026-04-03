@@ -120,12 +120,16 @@ export async function fetchOfficialUrl(nazohirobaEventUrl: string): Promise<stri
   }
 }
 
+// ターゲット都道府県名のセット（フィルタリング用）
+export const TARGET_PREFECTURE_NAMES = TARGET_PREFECTURES.map((p) => p.name)
+
 /**
  * 全対象ページからイベントURLを収集する
  * （東京/神奈川/埼玉/千葉 × 街歩き/周遊型/持ち帰りの全組み合わせ）
+ * 各URLにはクロール元の都道府県名を紐付けて返す
  */
-export async function collectAllEventUrls(): Promise<string[]> {
-  const allUrls = new Set<string>()
+export async function collectAllEventUrls(): Promise<{ url: string; crawledPrefecture: string }[]> {
+  const urlMap = new Map<string, string>() // url -> crawledPrefecture（最初に見つかったもの優先）
 
   for (const pref of TARGET_PREFECTURES) {
     for (const type of TARGET_TYPES) {
@@ -139,14 +143,14 @@ export async function collectAllEventUrls(): Promise<string[]> {
         fetchTotalPages(basePageUrl),
       ])
 
-      firstPageUrls.forEach((u) => allUrls.add(u))
+      firstPageUrls.forEach((u) => { if (!urlMap.has(u)) urlMap.set(u, pref.name) })
       console.log(`  → ページ1: ${firstPageUrls.length}件, 全${totalPages}ページ`)
 
       // 2ページ目以降を順次取得（サーバー負荷軽減のため直列）
       for (let page = 2; page <= totalPages; page++) {
         const pageUrl = `${basePageUrl}/page/${page}`
         const urls = await fetchEventUrlsFromPage(pageUrl)
-        urls.forEach((u) => allUrls.add(u))
+        urls.forEach((u) => { if (!urlMap.has(u)) urlMap.set(u, pref.name) })
         console.log(`  → ページ${page}: ${urls.length}件`)
 
         // 連続リクエストを少し間隔をあける
@@ -155,6 +159,6 @@ export async function collectAllEventUrls(): Promise<string[]> {
     }
   }
 
-  console.log(`[crawl] 合計収集URL数: ${allUrls.size}件`)
-  return Array.from(allUrls)
+  console.log(`[crawl] 合計収集URL数: ${urlMap.size}件`)
+  return Array.from(urlMap.entries()).map(([url, crawledPrefecture]) => ({ url, crawledPrefecture }))
 }

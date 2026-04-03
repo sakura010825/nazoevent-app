@@ -12,6 +12,43 @@ if (!GEMINI_API_KEY) {
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null
 
 /**
+ * Geminiモデル名を取得するヘルパー
+ */
+async function getModelNames(): Promise<string[]> {
+  const preferredModel = process.env.GEMINI_MODEL_NAME
+  if (preferredModel) return [preferredModel]
+
+  try {
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+    )
+
+    if (response.ok) {
+      const data = await response.json()
+      const available = data.models
+        ?.filter((m: any) =>
+          m.supportedGenerationMethods?.includes('generateContent') &&
+          m.name && !m.name.includes('embedding') && !m.name.includes('embed')
+        )
+        .map((m: any) => m.name.replace('models/', '')) || []
+      if (available.length > 0) return available
+    }
+  } catch (error) {
+    console.error('Error fetching available models:', error)
+  }
+
+  return [
+    'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest',
+    'gemini-1.5-flash-002', 'gemini-1.5-flash',
+    'gemini-1.5-pro-002', 'gemini-1.5-pro', 'gemini-pro',
+  ]
+}
+
+/**
  * URLからテキストと画像URLを抽出
  * 1. Jina Reader（Markdown）で取得を試みる
  * 2. 失敗/短すぎる場合は通常のHTML取得＋cheerioでフォールバック
@@ -207,6 +244,7 @@ ${text}
 4. duration_text: 「100分」「約2時間」などの所要時間を抽出してください。
 5. type: 以下のいずれかに分類してください：[周遊型, ホール型, ルーム型, オンライン, 持ち帰り謎, その他]
 6. description: イベントの世界観やストーリー、どんな謎解きかを100文字程度で要約してください。
+7. location: 開催場所・会場名・集合場所を抽出してください（例: "東京ミステリーサーカス"、"下北沢駅周辺"）。住所があれば会場名+住所で。
 
 【注意】
 - 出力は必ず純粋なJSONのみとしてください。
@@ -344,5 +382,60 @@ ${text}
   throw new Error(
     `利用可能なGeminiモデルが見つかりませんでした。試行したモデル: ${modelNames.join(', ')}。最後のエラー: ${lastError?.message}`
   )
+}
+
+/**
+ * 公式ページのURLから開催場所を抽出する
+ */
+export async function extractLocationFromUrl(url: string): Promise<string | null> {
+  if (!genAI) {
+    console.error('GEMINI_API_KEYが設定されていません')
+    return null
+  }
+
+  try {
+    const { text } = await fetchAndExtractText(url)
+
+    const modelNames = await getModelNames()
+
+    const prompt = `
+以下のテキストは謎解きイベントの公式ページの内容です。
+このイベントの開催場所（会場名や住所）を抽出してください。
+
+テキスト:
+${text}
+
+【ルール】
+- 開催場所・会場名・集合場所を簡潔に返してください（例: "東京ミステリーサーカス"、"下北沢駅周辺"、"新宿区立〇〇ホール"）
+- 複数の会場がある場合は代表的なものを1つ選んでください
+- 場所が特定できない場合は "null" と返してください
+- 余計な説明は不要です。場所の文字列だけを返してください
+`
+
+    for (const modelName of modelNames) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName })
+        const result = await model.generateContent(prompt)
+        const responseText = result.response.text().trim()
+
+        if (!responseText || responseText === 'null' || responseText === 'NULL') {
+          return null
+        }
+
+        // 余計な引用符やマークダウンを除去
+        const cleaned = responseText.replace(/^["'`]+|["'`]+$/g, '').trim()
+        return cleaned || null
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('not found')) continue
+        console.error(`Error extracting location with model ${modelName}:`, error)
+        return null
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error('Error extracting location from URL:', error)
+    return null
+  }
 }
 

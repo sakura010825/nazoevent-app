@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { extractLocationFromUrl } from '@/lib/ai/extract-event'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+export const maxDuration = 300
+
+function isAuthorized(request: NextRequest): boolean {
+  const authHeader = request.headers.get('authorization')
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) return false
+  if (authHeader === `Bearer ${cronSecret}`) return true
+  const secret = new URL(request.url).searchParams.get('secret')
+  if (secret === cronSecret) return true
+  return false
+}
+
+export async function GET(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createAdminClient() as any
+  const results = { updated: 0, skipped: 0, failed: 0 }
+
+  // location が未設定で official_url があるイベントを取得（20件ずつ処理）
+  const { data: events, error } = await supabase
+    .from('events')
+    .select('id, title, official_url, url')
+    .is('location', null)
+    .not('official_url', 'is', null)
+    .limit(20)
+
+  if (error) {
+    return NextResponse.json({ error: String(error.message ?? error) }, { status: 500 })
+  }
+
+  if (!events || events.length === 0) {
+    // official_url がないイベントも対象にする（nazohirobaページから抽出を試みる）
+    const { data: fallbackEvents, error: fallbackError } = await supabase
+      .from('events')
+      .select('id, title, url')
+      .is('location', null)
+      .is('official_url', null)
+      .like('url', '%nazohiroba.com%')
+      .limit(10)
+
+    if (fallbackError || !fallbackEvents || fallbackEvents.length === 0) {
+      return NextResponse.json({ success: true, message: '補完対象なし', results })
+    }
+
+    for (const event of fallbackEvents as { id: string; title: string; url: string }[]) {
+      try {
+        const location = await extractLocationFromUrl(event.url)
+
+        if (!location) {
+          results.skipped++
+          console.log(`[backfill-location] 場所見つからず: ${event.title}`)
+          continue
+        }
+
+        const { error: updateError } = await supabase
+          .from('events')
+          .update({ location })
+          .eq('id', event.id)
+
+        if (updateError) throw new Error(String(updateError.message ?? updateError))
+
+        results.updated++
+        console.log(`[backfill-location] 更新完了: ${event.title} → ${location}`)
+
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      } catch (err) {
+        results.failed++
+        console.error(`[backfill-location] エラー: ${event.title}`, err)
+      }
+    }
+
+    return NextResponse.json({ success: true, results })
+  }
+
+  for (const event of events as { id: string; title: string; official_url: string; url: string }[]) {
+    try {
+      const location = await extractLocationFromUrl(event.official_url)
+
+      if (!location) {
+        results.skipped++
+        console.log(`[backfill-location] 場所見つからず: ${event.title}`)
+        continue
+      }
+
+      const { error: updateError } = await supabase
+        .from('events')
+        .update({ location })
+        .eq('id', event.id)
+
+      if (updateError) throw new Error(String(updateError.message ?? updateError))
+
+      results.updated++
+      console.log(`[backfill-location] 更新完了: ${event.title} → ${location}`)
+
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    } catch (err) {
+      results.failed++
+      console.error(`[backfill-location] エラー: ${event.title}`, err)
+    }
+  }
+
+  return NextResponse.json({ success: true, results })
+}

@@ -13,6 +13,7 @@ interface EventDetailActionsProps {
 
 export default function EventDetailActions({ event }: EventDetailActionsProps) {
   const [showEditModal, setShowEditModal] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const supabase = createClient()
   const router = useRouter()
@@ -39,8 +40,11 @@ export default function EventDetailActions({ event }: EventDetailActionsProps) {
           <span>編集</span>
         </button>
         <button
+          disabled={isDeleting}
           onClick={async () => {
+            if (isDeleting) return
             if (window.confirm('このイベントを削除してもよろしいですか？')) {
+              setIsDeleting(true)
               const { error } = await supabase
                 .from('events')
                 .delete()
@@ -49,12 +53,13 @@ export default function EventDetailActions({ event }: EventDetailActionsProps) {
               if (error) {
                 console.error('Error deleting event:', error)
                 alert('イベントの削除に失敗しました')
+                setIsDeleting(false)
               } else {
                 router.push('/')
               }
             }
           }}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-100 text-red-700 rounded-2xl font-semibold hover:bg-red-200 transition-colors"
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-100 text-red-700 rounded-2xl font-semibold hover:bg-red-200 transition-colors ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <Trash2 className="w-5 h-5" />
           <span>削除</span>

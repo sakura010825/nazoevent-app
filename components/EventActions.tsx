@@ -31,23 +31,23 @@ export default function EventActions({ event, initialIsFavorite }: EventActionsP
 
     try {
       if (isFavorite) {
-        // お気に入りを削除
-        await supabase
+        const { error } = await supabase
           .from('user_event_logs')
           .delete()
           .eq('user_id', user.id)
           .eq('event_id', event.id)
           .eq('status', 'FAVORITE')
+        if (error) throw error
         setIsFavorite(false)
       } else {
-        // お気に入りを追加
-        await supabase
+        const { error } = await supabase
           .from('user_event_logs')
           .upsert({
             user_id: user.id,
             event_id: event.id,
             status: 'FAVORITE',
           })
+        if (error) throw error
         setIsFavorite(true)
       }
     } catch (error) {

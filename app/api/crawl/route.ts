@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { collectAllEventUrls, fetchOfficialUrl } from '@/lib/crawler/nazohiroba'
-import { extractEventFromUrl } from '@/lib/ai/extract-event'
+import { collectAllEventUrls, fetchOfficialUrl, TARGET_PREFECTURE_NAMES } from '@/lib/crawler/nazohiroba'
+import { extractEventFromUrl, extractLocationFromUrl } from '@/lib/ai/extract-event'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 // Vercel Pro プランで最大300秒まで延長（デフォルト10秒→300秒）
@@ -48,9 +48,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // 1. ナゾヒロバから全対象URLを収集
-    const collectedUrls = await collectAllEventUrls()
-    results.collected = collectedUrls.length
+    // 1. ナゾヒロバから全対象URLを収集（都道府県情報付き）
+    const collectedItems = await collectAllEventUrls()
+    results.collected = collectedItems.length
 
     // 2. すでにDBに登録済みのURLを取得
     const { data: existingEvents, error: fetchError } = await supabase
@@ -64,24 +64,47 @@ export async function GET(request: NextRequest) {
     const existingUrls = new Set((existingEvents || []).map((e: { url: string }) => e.url))
 
     // 3. 新着URLのみ抽出（1回の実行上限を適用）
-    const allNewUrls = collectedUrls.filter((url) => !existingUrls.has(url))
-    const newUrls = allNewUrls.slice(0, MAX_PROCESS_PER_RUN)
-    results.skipped = collectedUrls.length - allNewUrls.length
+    const allNewItems = collectedItems.filter((item) => !existingUrls.has(item.url))
+    const newItems = allNewItems.slice(0, MAX_PROCESS_PER_RUN)
+    results.skipped = collectedItems.length - allNewItems.length
 
-    console.log(`[crawl] 新着: ${allNewUrls.length}件 / 今回処理: ${newUrls.length}件 / スキップ(登録済み): ${results.skipped}件`)
+    console.log(`[crawl] 新着: ${allNewItems.length}件 / 今回処理: ${newItems.length}件 / スキップ(登録済み): ${results.skipped}件`)
 
     // 4. 新着URLを1件ずつ処理（AI抽出 → DB登録）
-    for (const url of newUrls) {
+    for (const { url, crawledPrefecture } of newItems) {
       try {
-        console.log(`[crawl] 処理中: ${url}`)
+        console.log(`[crawl] 処理中: ${url} (クロール元: ${crawledPrefecture})`)
 
         // AI でイベント情報を抽出
         const extracted = await extractEventFromUrl(url)
+
+        // AIが抽出したareaがターゲット外の場合、クロール元の都道府県を使用
+        let area = extracted.area || null
+        if (area && !TARGET_PREFECTURE_NAMES.some((name) => area!.includes(name))) {
+          console.log(`[crawl] エリア補正: "${area}" → "${crawledPrefecture}" (ターゲット外のため)`)
+          area = crawledPrefecture
+        }
+        if (!area) {
+          area = crawledPrefecture
+        }
 
         // ナゾヒロバの詳細ページから公式URLを取得
         const officialUrl = await fetchOfficialUrl(url)
         if (officialUrl) {
           console.log(`[crawl] 公式URL取得: ${officialUrl}`)
+        }
+
+        // locationがnullの場合、公式ページから場所を抽出
+        let location = extracted.location || null
+        if (!location && officialUrl) {
+          try {
+            location = await extractLocationFromUrl(officialUrl)
+            if (location) {
+              console.log(`[crawl] 公式ページから場所取得: ${location}`)
+            }
+          } catch (err) {
+            console.warn(`[crawl] 場所抽出失敗: ${err}`)
+          }
         }
 
         // DBに登録
@@ -91,8 +114,8 @@ export async function GET(request: NextRequest) {
           title: extracted.title,
           start_date: extracted.start_date,
           end_date: extracted.end_date || null,
-          location: extracted.location || null,
-          area: extracted.area || null,
+          location,
+          area,
           type: extracted.type || null,
           maker: extracted.maker || null,
           price: extracted.price || null,
@@ -113,7 +136,7 @@ export async function GET(request: NextRequest) {
           }
         } else {
           results.registered++
-          console.log(`[crawl] 登録完了: ${extracted.title}`)
+          console.log(`[crawl] 登録完了: ${extracted.title} (エリア: ${area})`)
         }
 
         // AI APIへの連続リクエストを緩和
