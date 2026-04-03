@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { collectAllEventUrls, fetchOfficialUrl, TARGET_PREFECTURE_NAMES } from '@/lib/crawler/nazohiroba'
-import { extractEventFromUrl, extractLocationFromUrl } from '@/lib/ai/extract-event'
+import { collectAllEventUrls, fetchOfficialUrl, fetchLocationFromNazohiroba, TARGET_PREFECTURE_NAMES } from '@/lib/crawler/nazohiroba'
+import { extractEventFromUrl } from '@/lib/ai/extract-event'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 // Vercel Pro プランで最大300秒まで延長（デフォルト10秒→300秒）
@@ -94,16 +94,16 @@ export async function GET(request: NextRequest) {
           console.log(`[crawl] 公式URL取得: ${officialUrl}`)
         }
 
-        // locationがnullの場合、公式ページから場所を抽出
+        // locationがnullの場合、nazohirobaページから場所をスクレイピング
         let location = extracted.location || null
-        if (!location && officialUrl) {
+        if (!location) {
           try {
-            location = await extractLocationFromUrl(officialUrl)
+            location = await fetchLocationFromNazohiroba(url)
             if (location) {
-              console.log(`[crawl] 公式ページから場所取得: ${location}`)
+              console.log(`[crawl] nazohirobaから場所取得: ${location}`)
             }
           } catch (err) {
-            console.warn(`[crawl] 場所抽出失敗: ${err}`)
+            console.warn(`[crawl] 場所取得失敗: ${err}`)
           }
         }
 

@@ -82,6 +82,39 @@ async function fetchTotalPages(url: string): Promise<number> {
 }
 
 /**
+ * ナゾヒロバのイベント詳細ページから開催場所を取得する
+ * 詳細情報テーブルの「場所」行から値を抽出
+ */
+export async function fetchLocationFromNazohiroba(nazohirobaEventUrl: string): Promise<string | null> {
+  try {
+    const response = await fetch(nazohirobaEventUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    })
+    if (!response.ok) return null
+
+    const html = await response.text()
+    const $ = load(html)
+
+    // .MysteryFiltersRow-title が「場所」の行を探し、同じ行の .MysteryFiltersRow-text を取得
+    let location: string | null = null
+    $('.MysteryFiltersRow').each((_, row) => {
+      const title = $(row).find('.MysteryFiltersRow-title').text().trim()
+      if (title === '場所') {
+        const text = $(row).find('.MysteryFiltersRow-text').text().trim()
+        if (text) location = text
+      }
+    })
+
+    return location
+  } catch {
+    return null
+  }
+}
+
+/**
  * ナゾヒロバのイベント詳細ページから公式サイトURLを取得する
  * 「〇〇の公式ページはこちら」というリンクを探す
  */
