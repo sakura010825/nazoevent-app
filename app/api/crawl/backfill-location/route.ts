@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { extractLocationFromUrl } from '@/lib/ai/extract-event'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export const maxDuration = 300
+export const maxDuration = 10
 
 function isAuthorized(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     .select('id, title, official_url, url')
     .is('location', null)
     .not('official_url', 'is', null)
-    .limit(20)
+    .limit(3)
 
   if (error) {
     return NextResponse.json({ error: String(error.message ?? error) }, { status: 500 })
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       .is('location', null)
       .is('official_url', null)
       .like('url', '%nazohiroba.com%')
-      .limit(10)
+      .limit(3)
 
     if (fallbackError || !fallbackEvents || fallbackEvents.length === 0) {
       return NextResponse.json({ success: true, message: '補完対象なし', results })
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
         results.updated++
         console.log(`[backfill-location] 更新完了: ${event.title} → ${location}`)
 
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        await new Promise((resolve) => setTimeout(resolve, 300))
       } catch (err) {
         results.failed++
         console.error(`[backfill-location] エラー: ${event.title}`, err)
