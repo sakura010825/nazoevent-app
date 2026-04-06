@@ -158,9 +158,12 @@ export async function GET(request: NextRequest) {
 
   console.log(`[crawl] 完了:`, results)
 
-  // Gmail通知（失敗しても処理は止めない）
+  // Gmail通知（失敗しても処理は止めない・8秒でタイムアウト）
   try {
-    await sendCrawlNotification(results)
+    await Promise.race([
+      sendCrawlNotification(results),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Gmail timeout')), 8000)),
+    ])
   } catch (err) {
     console.error('[crawl] Gmail通知エラー:', err)
   }
