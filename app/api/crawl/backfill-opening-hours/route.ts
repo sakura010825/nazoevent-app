@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     .select('id, title, url, official_url')
     .is('opening_hours', null)
     .eq('is_deleted', false)
-    .limit(5)
+    .limit(2)
 
   if (error) {
     return NextResponse.json({ error: String(error.message ?? error) }, { status: 500 })
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       console.log(`[backfill-opening-hours] 更新完了: ${event.title} → ${extracted.opening_hours}`)
 
       // AI APIへの連続リクエストを緩和
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await new Promise((resolve) => setTimeout(resolve, 500))
     } catch (err) {
       results.failed++
       console.error(`[backfill-opening-hours] エラー: ${event.title}`, err)
