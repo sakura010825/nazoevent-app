@@ -123,6 +123,7 @@ export async function GET(request: NextRequest) {
           price: extracted.price || null,
           description: extracted.description || null,
           duration_text: extracted.duration_text || null,
+          opening_hours: extracted.opening_hours || null,
           image_url: extracted.image_url || null,
           is_purchased: false,
           created_by: systemUserId,

@@ -28,6 +28,7 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
     price: event.price || '',
     description: event.description || '',
     duration_text: (event as any).duration_text || '',
+    opening_hours: (event as any).opening_hours || '',
     is_purchased: (event as any).is_purchased || false,
   })
 
@@ -46,6 +47,7 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
       price: event.price || '',
       description: event.description || '',
       duration_text: (event as any).duration_text || '',
+      opening_hours: (event as any).opening_hours || '',
       is_purchased: (event as any).is_purchased || false,
     })
   }, [event])
@@ -206,6 +208,19 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
               value={formData.price}
               onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               placeholder="例: 3,500円"
+              className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              プレイ可能時間
+            </label>
+            <input
+              type="text"
+              value={formData.opening_hours}
+              onChange={(e) => setFormData({ ...formData, opening_hours: e.target.value })}
+              placeholder="例: 10:00〜20:00、平日 12:00-19:00 / 土日祝 10:00-20:00"
               className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange"
             />
           </div>

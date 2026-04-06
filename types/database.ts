@@ -25,6 +25,7 @@ export interface Database {
           price: string | null
           description: string | null
           duration_text: string | null
+          opening_hours: string | null
           created_by: string
           created_at: string
           updated_at: string
@@ -46,6 +47,7 @@ export interface Database {
           price?: string | null
           description?: string | null
           duration_text?: string | null
+          opening_hours?: string | null
           created_by: string
           created_at?: string
           updated_at?: string
@@ -67,6 +69,7 @@ export interface Database {
           price?: string | null
           description?: string | null
           duration_text?: string | null
+          opening_hours?: string | null
           created_by?: string
           created_at?: string
           updated_at?: string
@@ -124,6 +127,7 @@ export interface Database {
           price: string | null
           description: string | null
           duration_text: string | null
+          opening_hours: string | null
           created_by: string
           created_at: string
           updated_at: string

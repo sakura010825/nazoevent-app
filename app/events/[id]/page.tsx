@@ -138,6 +138,16 @@ export default async function EventDetailPage({ params }: PageProps) {
                 </div>
               )}
 
+              {(event as any).opening_hours && (
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">プレイ可能時間</div>
+                    <div className="text-blue-600 font-medium">{(event as any).opening_hours}</div>
+                  </div>
+                </div>
+              )}
+
               {(event as any).duration_text && (
                 <div className="flex items-start gap-3">
                   <Clock className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />

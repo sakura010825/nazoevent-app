@@ -15,6 +15,7 @@ export const ExtractedEventSchema = z.object({
   price: z.string().nullable().optional().describe('価格情報（例: 3,500円、要予約）'),
   description: z.string().nullable().optional().describe('ストーリー概要・説明'),
   duration_text: z.string().nullable().optional().describe('所要時間（例: 90分、2時間、60-90分）'),
+  opening_hours: z.string().nullable().optional().describe('営業時間・受付時間・プレイ可能時間（例: 10:00〜20:00、平日 12:00-19:00 / 土日祝 10:00-20:00）'),
   image_url: z.string().url().nullable().optional().describe('メインビジュアル画像のURL'),
 })
 

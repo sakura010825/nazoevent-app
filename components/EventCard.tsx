@@ -174,6 +174,13 @@ export default function EventCardComponent({ event }: EventCardProps) {
             </div>
           )}
 
+          {(event as any).opening_hours && (
+            <div className="flex items-start gap-2">
+              <Clock className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-500" />
+              <span className="text-blue-600 font-medium">{(event as any).opening_hours}</span>
+            </div>
+          )}
+
           {(event as any).duration_text && (
             <div className="flex items-center gap-2">
               <div className="bg-gray-100 text-gray-700 rounded-full px-3 py-1 text-sm flex items-center gap-1.5">
