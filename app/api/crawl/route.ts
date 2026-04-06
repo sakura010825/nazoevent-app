@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { collectAllEventUrls, fetchOfficialUrl, fetchLocationFromNazohiroba, TARGET_PREFECTURE_NAMES } from '@/lib/crawler/nazohiroba'
 import { extractEventFromUrl } from '@/lib/ai/extract-event'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { sendCrawlNotification } from '@/lib/notify/gmail'
 
 // Vercel Pro プランで最大300秒まで延長（デフォルト10秒→300秒）
 export const maxDuration = 300
@@ -156,5 +157,13 @@ export async function GET(request: NextRequest) {
   }
 
   console.log(`[crawl] 完了:`, results)
+
+  // Gmail通知（失敗しても処理は止めない）
+  try {
+    await sendCrawlNotification(results)
+  } catch (err) {
+    console.error('[crawl] Gmail通知エラー:', err)
+  }
+
   return NextResponse.json({ success: true, results })
 }
