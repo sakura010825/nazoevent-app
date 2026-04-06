@@ -138,7 +138,7 @@ export default async function EventDetailPage({ params }: PageProps) {
                 </div>
               )}
 
-              {(event as any).opening_hours && (
+              {(event as any).opening_hours && (event as any).opening_hours !== 'none' && (
                 <div className="flex items-start gap-3">
                   <Clock className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
                   <div>

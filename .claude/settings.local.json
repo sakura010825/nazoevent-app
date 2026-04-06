@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(npx vercel:*)",
+      "Bash(bash scripts/backfill-opening-hours.sh)",
+      "Bash(node -e \":*)",
+      "WebFetch(domain:nazohiroba.com)",
+      "WebFetch(domain:www.nazotown.jp)",
+      "WebFetch(domain:machihack.com)",
+      "WebFetch(domain:i-ku-kan.com)",
+      "WebFetch(domain:utsuwanowada.jp)",
+      "Bash(node scripts/backfill-opening-hours.mjs)"
     ]
   }
 }

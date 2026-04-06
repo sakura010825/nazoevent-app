@@ -174,7 +174,7 @@ export default function EventCardComponent({ event }: EventCardProps) {
             </div>
           )}
 
-          {(event as any).opening_hours && (
+          {(event as any).opening_hours && (event as any).opening_hours !== 'none' && (
             <div className="flex items-start gap-2">
               <Clock className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-500" />
               <span className="text-blue-600 font-medium">{(event as any).opening_hours}</span>

@@ -23,7 +23,7 @@ async function getModelNames(): Promise<string[]> {
     if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
       { method: 'GET', headers: { 'Content-Type': 'application/json' } }
     )
 
@@ -42,9 +42,7 @@ async function getModelNames(): Promise<string[]> {
   }
 
   return [
-    'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest',
-    'gemini-1.5-flash-002', 'gemini-1.5-flash',
-    'gemini-1.5-pro-002', 'gemini-1.5-pro', 'gemini-pro',
+    'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest',
   ]
 }
 
@@ -180,7 +178,7 @@ export async function extractEventFromUrl(url: string): Promise<ExtractedEvent> 
       }
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
         { 
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
@@ -215,13 +213,7 @@ export async function extractEventFromUrl(url: string): Promise<ExtractedEvent> 
     // フォールバック: 一般的なモデル名（最新の形式も含む）
     if (modelNames.length === 0) {
       modelNames = [
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro-latest',
-        'gemini-1.5-flash-002',
-        'gemini-1.5-flash',
-        'gemini-1.5-pro-002',
-        'gemini-1.5-pro',
-        'gemini-pro',
+        'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest',
       ]
     }
   }
@@ -388,6 +380,61 @@ ${text}
   throw new Error(
     `利用可能なGeminiモデルが見つかりませんでした。試行したモデル: ${modelNames.join(', ')}。最後のエラー: ${lastError?.message}`
   )
+}
+
+/**
+ * 公式ページのURLからプレイ可能時間（営業時間・受付時間）を抽出する
+ */
+export async function extractOpeningHoursFromUrl(url: string): Promise<string | null> {
+  if (!genAI) {
+    console.error('GEMINI_API_KEYが設定されていません')
+    return null
+  }
+
+  try {
+    const { text } = await fetchAndExtractText(url)
+
+    const modelNames = await getModelNames()
+
+    const prompt = `
+以下のテキストは謎解きイベントの公式ページの内容です。
+このイベントをプレイできる時間帯（営業時間・受付時間・開催時間）を抽出してください。
+
+テキスト:
+${text}
+
+【ルール】
+- 「営業時間」「受付時間」「開催時間」「プレイ可能時間」「開館時間」「受付開始」などの表現を探してください
+- 「10:00〜20:00」「11時〜18時（最終受付17:00）」「平日 12:00-19:00 / 土日祝 10:00-20:00」のような形式で返してください
+- 時間帯情報が見つかった場合のみ返してください。見つからない場合は "null" と返してください
+- 「開催期間中いつでもプレイ可能」「24時間」など時間制限のないイベントは "null" を返してください
+- 余計な説明は不要です。時間帯の文字列だけを返してください
+`
+
+    for (const modelName of modelNames) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName })
+        const result = await model.generateContent(prompt)
+        const responseText = result.response.text().trim()
+
+        if (!responseText || responseText === 'null' || responseText === 'NULL') {
+          return null
+        }
+
+        const cleaned = responseText.replace(/^["'`]+|["'`]+$/g, '').trim()
+        return cleaned || null
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('not found')) continue
+        console.error(`Error extracting opening hours with model ${modelName}:`, error)
+        return null
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error('Error extracting opening hours from URL:', error)
+    return null
+  }
 }
 
 /**
