@@ -1,17 +1,4 @@
-import nodemailer from 'nodemailer'
-
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // SSL（Vercelでport 587/STARTTLSはブロックされる場合がある）
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-  connectionTimeout: 5000, // 5秒で接続タイムアウト
-  greetingTimeout: 5000,
-  socketTimeout: 5000,
-})
+import { Resend } from 'resend'
 
 interface CrawlResults {
   collected: number
@@ -23,10 +10,13 @@ interface CrawlResults {
 
 export async function sendCrawlNotification(results: CrawlResults): Promise<void> {
   const to = process.env.GMAIL_USER
-  if (!to || !process.env.GMAIL_APP_PASSWORD) {
-    console.warn('[notify] GMAIL_USER or GMAIL_APP_PASSWORD not set, skipping notification')
+  const apiKey = process.env.RESEND_API_KEY
+  if (!to || !apiKey) {
+    console.warn('[notify] GMAIL_USER or RESEND_API_KEY not set, skipping notification')
     return
   }
+
+  const resend = new Resend(apiKey)
 
   const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
   const statusIcon = results.failed > 0 ? '⚠️' : results.registered > 0 ? '✅' : 'ℹ️'
@@ -48,12 +38,16 @@ export async function sendCrawlNotification(results: CrawlResults): Promise<void
 ${errorLines}
 `
 
-  await transporter.sendMail({
-    from: `NazoNote <${to}>`,
+  const { error } = await resend.emails.send({
+    from: 'NazoNote <onboarding@resend.dev>',
     to,
     subject,
     text,
   })
 
-  console.log(`[notify] Gmail通知送信完了: ${subject}`)
+  if (error) {
+    throw new Error(`Resend送信エラー: ${error.message}`)
+  }
+
+  console.log(`[notify] Resend通知送信完了: ${subject}`)
 }
