@@ -18,6 +18,7 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
   const [formData, setFormData] = useState({
     title: event.title || '',
     url: event.url || '',
+    official_url: (event as any).official_url || '',
     image_url: event.image_url || '',
     start_date: event.start_date || '',
     end_date: event.end_date || '',
@@ -37,6 +38,7 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
     setFormData({
       title: event.title || '',
       url: event.url || '',
+      official_url: (event as any).official_url || '',
       image_url: event.image_url || '',
       start_date: event.start_date || '',
       end_date: event.end_date || '',
@@ -65,12 +67,26 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
 
       // 認証済みユーザーは誰でも編集可能（RLSで保護されている）
 
+      // official_url が変更され、かつ opening_hours が手動編集されていない場合、
+      // opening_hours を null にリセット → 次回バックフィルで新URLから再抽出される
+      const originalOfficialUrl = (event as any).official_url || ''
+      const originalOpeningHours = (event as any).opening_hours || ''
+      const officialUrlChanged = formData.official_url !== originalOfficialUrl
+      const openingHoursUntouched = formData.opening_hours === originalOpeningHours
+
+      const updatePayload: Record<string, unknown> = {
+        ...formData,
+        official_url: formData.official_url || null,
+        end_date: formData.end_date || null,
+      }
+
+      if (officialUrlChanged && openingHoursUntouched) {
+        updatePayload.opening_hours = null
+      }
+
       const { error } = await supabase
         .from('events')
-        .update({
-          ...formData,
-          end_date: formData.end_date || null,
-        })
+        .update(updatePayload)
         .eq('id', event.id)
 
       if (error) {
@@ -119,7 +135,7 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
-              URL *
+              ナゾヒロバURL *
             </label>
             <input
               type="url"
@@ -128,6 +144,22 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
               onChange={(e) => setFormData({ ...formData, url: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              公式サイトURL
+            </label>
+            <input
+              type="url"
+              value={formData.official_url}
+              onChange={(e) => setFormData({ ...formData, official_url: e.target.value })}
+              placeholder="例: https://www.jp.square-enix.com/catrip/sumida"
+              className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              「公式サイトで確認する」ボタンのリンク先。変更すると次回のクロールで「プレイ可能時間」が自動再抽出されます。
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
