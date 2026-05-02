@@ -135,15 +135,18 @@ export default function EditEventModal({ event, onClose }: EditEventModalProps) 
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
-              ナゾヒロバURL *
+              ナゾヒロバURL（編集不可）
             </label>
             <input
               type="url"
               required
+              readOnly
               value={formData.url}
-              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange"
+              className="w-full px-4 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-2xl cursor-not-allowed"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              この値はクロール時の重複検知キーに使われるため変更できません。公式サイトのリンク先は下の「公式サイトURL」で変更してください。
+            </p>
           </div>
 
           <div>
