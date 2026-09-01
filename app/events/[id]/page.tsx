@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { MapPin, Calendar, ExternalLink, ArrowLeft, PawPrint, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { formatDateRange } from '@/lib/utils/event'
+import { sanitizeOfficialUrl } from '@/lib/utils/official-url'
 import HeaderAuth from '@/components/HeaderAuth'
 import EventActions from '@/components/EventActions'
 import EventImage from '@/components/EventImage'
@@ -41,6 +42,11 @@ export default async function EventDetailPage({ params }: PageProps) {
       .single()
     isFavorite = !!favorite
   }
+
+  // 過去のクロールで広告ページ等が official_url に入っているデータがあるため、
+  // 表示時にも不正なURLを弾いてナゾヒロバのページにフォールバックする
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const officialUrl = sanitizeOfficialUrl((event as any).official_url)
 
   return (
     <main className="min-h-screen" style={{ backgroundColor: 'var(--background, #FFFBF0)' }}>
@@ -170,10 +176,10 @@ export default async function EventDetailPage({ params }: PageProps) {
             )}
 
             {/* 外部サイトリンク: official_url があればそちらを優先、なければ url を使用 */}
-            {((event as any).official_url || event.url) && (
+            {(officialUrl || event.url) && (
               <div className="mb-6 pt-6 border-t border-gray-200 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <a
-                  href={(event as any).official_url || event.url}
+                  href={officialUrl || event.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-6 py-3 bg-pastel-orange text-white rounded-2xl font-semibold hover:bg-opacity-90 transition-colors"
@@ -181,7 +187,7 @@ export default async function EventDetailPage({ params }: PageProps) {
                   <ExternalLink className="w-5 h-5" />
                   <span>公式サイトで確認する</span>
                 </a>
-                {(event as any).official_url && (
+                {officialUrl && (
                   <a
                     href={event.url}
                     target="_blank"

@@ -1,4 +1,5 @@
 import { load } from 'cheerio'
+import { isNonOfficialUrl } from '@/lib/utils/official-url'
 
 const BASE_URL = 'https://nazohiroba.com'
 
@@ -114,9 +115,42 @@ export async function fetchLocationFromNazohiroba(nazohirobaEventUrl: string): P
   }
 }
 
+// cheerio と @types/cheerio でエクスポート名が異なるため load() の戻り値から型を取る
+type CheerioRoot = ReturnType<typeof load>
+
+// 「『〇〇』の公式ページはこちら」形式のリンク文言
+const OFFICIAL_LINK_TEXT = /公式(ページ|サイト)(は)?こちら/
+// 「PR」表記の広告枠（fw-ad / futariwari-ad-section など）
+const AD_CONTAINER_SELECTOR = '[class*="fw-ad"], [class*="ad-section"], [class*="ad__"]'
+
+/**
+ * リンク文言から公式ページリンクを探す（マークアップ変更時のフォールバック）
+ * 広告枠（rel="sponsored" / PRバナー内）のリンクは除外する
+ */
+function findOfficialLinkByText($: CheerioRoot): string | undefined {
+  let found: string | undefined
+
+  $('a[href^="http"]').each((_, el) => {
+    if (found) return
+    const link = $(el)
+    const rel = link.attr('rel') || ''
+    if (rel.split(/\s+/).includes('sponsored')) return
+    if (link.closest(AD_CONTAINER_SELECTOR).length > 0) return
+    if (OFFICIAL_LINK_TEXT.test(link.text().replace(/\s+/g, ''))) {
+      found = link.attr('href')
+    }
+  })
+
+  return found
+}
+
 /**
  * ナゾヒロバのイベント詳細ページから公式サイトURLを取得する
- * 「〇〇の公式ページはこちら」というリンクを探す
+ *
+ * 詳細ページ下部の「『〇〇』の公式ページはこちら」ボタン（.official-button-container）
+ * だけを対象にする。ページ内には公式リンクより手前に「PR」表記の広告バナー
+ * （futariwari 等）が差し込まれているため、外部リンクを先頭から拾う方式では
+ * 広告ページを公式URLとして誤登録してしまう。
  */
 export async function fetchOfficialUrl(nazohirobaEventUrl: string): Promise<string | null> {
   try {
@@ -131,23 +165,19 @@ export async function fetchOfficialUrl(nazohirobaEventUrl: string): Promise<stri
     const html = await response.text()
     const $ = load(html)
 
-    // 公式ページリンクを探す（SNS・アプリストア・Google系は除外）
-    const EXCLUDE_DOMAINS = ['nazohiroba.com', 'twitter.com', 'x.com', 'instagram.com',
-      'facebook.com', 'apple.com', 'google.com', 'youtube.com', 'line.me']
+    const candidates = [
+      $('.official-button-container a[href^="http"]').first().attr('href'),
+      $('a.official-button[href^="http"]').first().attr('href'),
+      findOfficialLinkByText($),
+    ]
 
-    let officialUrl: string | null = null
+    for (const href of candidates) {
+      if (href && !isNonOfficialUrl(href)) return href
+    }
 
-    $('a[href]').each((_, el) => {
-      if (officialUrl) return // 見つかったら終了
-      const href = $(el).attr('href') || ''
-      if (!href.startsWith('http')) return
-      const isExcluded = EXCLUDE_DOMAINS.some((d) => href.includes(d))
-      if (!isExcluded) {
-        officialUrl = href
-      }
-    })
-
-    return officialUrl
+    // 公式サイトが無いイベントもあるため、見つからなければ null を返す
+    // （イベント詳細画面ではナゾヒロバのページにフォールバックする）
+    return null
   } catch {
     return null
   }
