@@ -85,6 +85,52 @@ Row Level Security (RLS) が有効化されており、以下のポリシーが�
 - `current_status` - 現在のステータス（開催中/開催予定/終了）
 - `days_until_end` - 終了日までの残り日数
 
+## 新しいテーブル/ビューを追加するときのテンプレ
+
+> **重要 — 2026-10-30 以降の Supabase 仕様変更対応**
+>
+> 2026-10-30 以降、`public` スキーマに新規作成したテーブルは
+> **明示的な GRANT を書かない限り Data API（supabase-js / PostgREST / GraphQL）から見えなくなる**。
+> NazoNote は Data API を使っているため、新テーブル追加時は必ず以下のテンプレに沿うこと。
+> 既存テーブル（`events`, `user_event_logs`, ビュー `events_with_stats`）は現状の権限が維持されるので触らなくてよい。
+>
+> 参考: https://github.com/orgs/supabase/discussions/45329
+
+新規マイグレーション（例: `006_add_xxx.sql`）は次のひな形を使う:
+
+```sql
+-- 1. テーブル作成
+CREATE TABLE IF NOT EXISTS public.your_table (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    -- ... カラム定義
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. Data API 公開のための明示的 GRANT（2026-10-30 以降は省略不可）
+GRANT SELECT ON public.your_table TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.your_table TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.your_table TO service_role;
+
+-- 3. RLS を必ず有効化
+ALTER TABLE public.your_table ENABLE ROW LEVEL SECURITY;
+
+-- 4. 必要なポリシーを追加（例）
+CREATE POLICY "Anyone can view"
+    ON public.your_table
+    FOR SELECT
+    USING (true);
+
+CREATE POLICY "Authenticated users can write"
+    ON public.your_table
+    FOR ALL
+    USING (auth.role() = 'authenticated')
+    WITH CHECK (auth.role() = 'authenticated');
+```
+
+GRANT が抜けていると PostgREST が `42501` エラーで必要な GRANT 文を返してくれるので、エラーを見たらこのテンプレに戻る。
+
+ビューを新規追加する場合も同様に `GRANT SELECT ON public.your_view TO anon, authenticated, service_role;` を書く。
+
 ## 次のステップ
 
 Phase 1完了後、以下を実装：
