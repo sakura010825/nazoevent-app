@@ -10,7 +10,16 @@
       "WebFetch(domain:machihack.com)",
       "WebFetch(domain:i-ku-kan.com)",
       "WebFetch(domain:utsuwanowada.jp)",
-      "Bash(node scripts/backfill-opening-hours.mjs)"
+      "Bash(node scripts/backfill-opening-hours.mjs)",
+      "Bash(node -e ':*)",
+      "Bash(npm install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(npx tsc *)",
+      "Bash(git commit -m ' *)",
+      "Bash(cp /tmp/check_dup.mjs ./check_dup.mjs)",
+      "Bash(node ./check_dup.mjs)"
     ]
   }
 }
