@@ -131,6 +131,18 @@ GRANT が抜けていると PostgREST が `42501` エラーで必要な GRANT �
 
 ビューを新規追加する場合も同様に `GRANT SELECT ON public.your_view TO anon, authenticated, service_role;` を書く。
 
+### 既存ビュー `events_with_stats` を作り直すときも GRANT を書く
+
+`DROP VIEW` → `CREATE VIEW` で作り直すと（`002_add_is_purchased.sql` の形）、Postgres 上は**新しいビュー**扱いになり、2026-10-30 以降は権限が付かない。
+トップページ（`app/page.tsx`）と詳細ページ（`app/events/[id]/page.tsx`）はこのビューを読んでいるので、**両方とも表示できなくなる**。
+
+- 列の並びを変えずに末尾へ足すだけなら `CREATE OR REPLACE VIEW` で済ませる（権限はそのまま残る）
+- `DROP` が必要なときは、同じマイグレーションの最後に次を書く:
+
+```sql
+GRANT SELECT ON public.events_with_stats TO anon, authenticated, service_role;
+```
+
 ## 次のステップ
 
 Phase 1完了後、以下を実装：
