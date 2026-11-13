@@ -47,7 +47,7 @@ Supabaseの「Table Editor」で以下のテーブルが作成されているこ
 | maker | text | 制作元（ナゾヒロバの「制作元」欄。`/api/crawl/backfill-maker` で補完） |
 | price | text | 価格情報 |
 | description | text | ストーリー・概要 |
-| is_purchased | boolean | **「行く予定」フラグ**（旧: チケット購入済み。2026-11 に意味を変更、列名はそのまま）。イベント単位なので全員で共有。「行った」を記録すると自動で false に戻る |
+| is_purchased | boolean | **「行く予定」フラグ**（旧: チケット購入済み。2026-11 に意味を変更、列名はそのまま）。イベント単位なので全員で共有。下の「お気に入り・行く予定のステータス」参照 |
 | is_deleted | boolean | 論理削除フラグ |
 | created_by | uuid | 登録したユーザーID（auth.users参照） |
 | created_at | timestamp | 作成日時 |
@@ -65,6 +65,20 @@ Supabaseの「Table Editor」で以下のテーブルが作成されているこ
 | rating | integer | 1-5の評価（行った場合のみ） |
 | memo | text | 内輪向けコメント |
 | updated_at | timestamp | 更新日時 |
+
+## お気に入り・行く予定のステータス（2人で共有）
+
+イベントごとに **なし → お気に入り → 行く予定** のどれか1つ（お気に入りと行く予定は重ならない）。
+
+| ステータス | DB上の持ち方 |
+|---|---|
+| 行く予定 | `events.is_purchased = true` |
+| お気に入り | 上以外で、`user_event_logs` に `FAVORITE` が1件以上ある（夫婦どちらが付けたものでも） |
+| なし | どちらでもない |
+
+変更は必ず `POST /api/events/[id]/status`（body: `{ "status": "none" | "favorite" | "planned" }`）を通す。
+相手が付けた `FAVORITE` も消す必要があり、`user_event_logs` の RLS（自分のログのみ操作可）では消せないため、
+API がログイン確認をしたうえでサービスロールで書き込む。「行った」を記録したときは `none` に戻す。
 
 ## セキュリティ（RLS）
 

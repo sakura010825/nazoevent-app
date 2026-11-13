@@ -2,22 +2,24 @@
 
 import { EventCard } from '@/types/event'
 import EventCardComponent from './EventCard'
-import PlannedEventList from './PlannedEventList'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import EventRowList from './EventRowList'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { saveListState, takeListScroll } from '@/lib/utils/list-state'
+import { getPlanStatus, PlanStatus, requestPlanStatus } from '@/lib/utils/event-status'
 
 interface EventListProps {
   events: EventCard[]
 }
 
-type TabKey = 'new' | 'ending' | 'going' | 'favorite'
+type TabKey = 'new' | 'ending' | 'favorite' | 'going'
 
+// 使い方の流れ：新着・終了が近い順で ♡ → お気に入りの中から「行く予定にする」
 const TABS: { key: TabKey; label: string; description: string }[] = [
   { key: 'new', label: '新着順', description: 'アプリに登録された新しい順' },
   { key: 'ending', label: '終了が近い順', description: '終了日が近い順（終了日未定は最後）' },
+  { key: 'favorite', label: 'お気に入り', description: '終了日が近い順・ここから「行く予定にする」' },
   { key: 'going', label: '行く予定', description: '終了日が近い順' },
-  { key: 'favorite', label: 'お気に入り', description: '終了日が近い順' },
 ]
 const DEFAULT_TAB: TabKey = 'new'
 
@@ -44,8 +46,17 @@ function normalizeArea(area: string | null): string | null {
   return area ? area.replace(/[都府県]$/, '') : null
 }
 
-function isFavoriteEvent(event: EventCard): boolean {
-  return !!event.isFavorite || event.favorite_count > 0
+const STATUS_MESSAGE: Partial<Record<`${PlanStatus}->${PlanStatus}`, string>> = {
+  'none->favorite': 'をお気に入りに入れました',
+  'favorite->none': 'をお気に入りから外しました',
+  'favorite->planned': 'を行く予定にしました',
+  'planned->favorite': 'をお気に入りに戻しました',
+}
+
+interface Toast {
+  id: number
+  message: string
+  undo?: () => void
 }
 
 export default function EventList({ events }: EventListProps) {
@@ -54,8 +65,64 @@ export default function EventList({ events }: EventListProps) {
   const tab = parseTab(searchParams.get('tab'))
   const areaFilter = searchParams.get('area')
 
+  const router = useRouter()
   const tabsAnchorRef = useRef<HTMLDivElement>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
+
+  // ステータス変更をサーバーの再取得を待たずに一覧へ反映するための上書き
+  const [overrides, setOverrides] = useState<Record<string, PlanStatus>>({})
+  const [toast, setToast] = useState<Toast | null>(null)
+
+  // サーバーから最新の一覧が届いたら、反映済みの上書きは捨てる
+  useEffect(() => {
+    setOverrides((current) => {
+      const next: Record<string, PlanStatus> = {}
+      for (const event of events) {
+        const value = current[event.id]
+        if (value && value !== getPlanStatus(event)) next[event.id] = value
+      }
+      return next
+    })
+  }, [events])
+
+  // トーストは数秒で消す
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 5000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
+  const statusOf = useCallback((event: EventCard) => overrides[event.id] ?? getPlanStatus(event), [overrides])
+
+  // 「元に戻す」は数秒後に呼ばれるので、その時点の最新の上書きを ref から読む
+  const overridesRef = useRef(overrides)
+  overridesRef.current = overrides
+
+  const changeStatus = useCallback(
+    async (event: EventCard, next: PlanStatus, options: { isUndo?: boolean; from?: PlanStatus } = {}) => {
+      const prev = options.from ?? overridesRef.current[event.id] ?? getPlanStatus(event)
+      if (prev === next) return
+      setOverrides((current) => ({ ...current, [event.id]: next }))
+      try {
+        await requestPlanStatus(event.id, next)
+        const message = STATUS_MESSAGE[`${prev}->${next}`]
+        setToast(
+          options.isUndo || !message
+            ? null
+            : {
+                id: Date.now(),
+                message: `「${event.title}」${message}`,
+                undo: () => changeStatus(event, prev, { isUndo: true, from: next }),
+              }
+        )
+        router.refresh()
+      } catch (err) {
+        setOverrides((current) => ({ ...current, [event.id]: prev }))
+        alert(err instanceof Error ? err.message : 'ステータスの更新に失敗しました')
+      }
+    },
+    [router]
+  )
 
   // ページ上部のヘッダー（sticky）の高さを測って、タブをその直下に貼り付ける
   useEffect(() => {
@@ -124,10 +191,10 @@ export default function EventList({ events }: EventListProps) {
     () => ({
       new: [...areaEvents].sort(byCreatedDesc),
       ending: [...areaEvents].sort(byEndDate),
-      going: areaEvents.filter((e) => e.is_purchased).sort(byEndDate),
-      favorite: areaEvents.filter(isFavoriteEvent).sort(byEndDate),
+      favorite: areaEvents.filter((e) => statusOf(e) === 'favorite').sort(byEndDate),
+      going: areaEvents.filter((e) => statusOf(e) === 'planned').sort(byEndDate),
     }),
-    [areaEvents]
+    [areaEvents, statusOf]
   )
 
   const visibleEvents = tabEvents[tab]
@@ -205,7 +272,12 @@ export default function EventList({ events }: EventListProps) {
             {tab === 'going' ? (
               <>
                 <p className="text-gray-500 text-lg">行く予定のイベントはまだありません</p>
-                <p className="text-gray-400 text-sm mt-2">イベントの「行く予定🐾」ボタンで追加できます</p>
+                <p className="text-gray-400 text-sm mt-2">お気に入りタブの「行く予定にする🐾」で追加できます</p>
+              </>
+            ) : tab === 'favorite' ? (
+              <>
+                <p className="text-gray-500 text-lg">お気に入りはまだありません</p>
+                <p className="text-gray-400 text-sm mt-2">新着順・終了が近い順のイベントの ♡ で追加できます</p>
               </>
             ) : (
               <>
@@ -214,16 +286,47 @@ export default function EventList({ events }: EventListProps) {
               </>
             )}
           </div>
-        ) : tab === 'going' ? (
-          <PlannedEventList events={visibleEvents} />
+        ) : tab === 'favorite' || tab === 'going' ? (
+          <EventRowList
+            events={visibleEvents}
+            variant={tab === 'favorite' ? 'favorite' : 'planned'}
+            onChangeStatus={changeStatus}
+          />
         ) : (
           <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {visibleEvents.map((event) => (
-              <EventCardComponent key={event.id} event={event} />
+              <EventCardComponent
+                key={event.id}
+                event={event}
+                status={statusOf(event)}
+                onChangeStatus={(next) => changeStatus(event, next)}
+              />
             ))}
           </div>
         )}
       </div>
+
+      {/* ステータス変更のお知らせ（元に戻せる） */}
+      {toast && (
+        <div
+          key={toast.id}
+          role="status"
+          className="fixed inset-x-4 bottom-6 z-50 mx-auto max-w-md flex items-center gap-3 rounded-2xl bg-gray-800 text-white text-sm px-4 py-3 shadow-soft-lg"
+        >
+          <span className="flex-1 line-clamp-2">{toast.message}</span>
+          {toast.undo && (
+            <button
+              onClick={() => {
+                toast.undo?.()
+                setToast(null)
+              }}
+              className="flex-shrink-0 font-bold text-orange-300 hover:text-orange-200"
+            >
+              元に戻す
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
