@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import EventList from '@/components/EventList'
 import HeaderAuth from '@/components/HeaderAuth'
@@ -59,8 +60,11 @@ export default async function Home() {
       </header>
 
       {/* メインコンテンツ */}
-      <div className="container mx-auto px-4 py-8">
-        <EventList events={eventsWithFavorite} />
+      <div className="container mx-auto px-4 pt-4 pb-8">
+        {/* EventList はタブを URL クエリ（useSearchParams）から読むため Suspense で包む */}
+        <Suspense>
+          <EventList events={eventsWithFavorite} />
+        </Suspense>
       </div>
 
       {/* デバッグ用：認証状態表示（開発環境のみ） */}

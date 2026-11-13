@@ -1,8 +1,9 @@
 'use client'
 
 import { EventCard } from '@/types/event'
-import { Heart, MapPin, Calendar, Flag, Edit, Trash2, PawPrint, Clock } from 'lucide-react'
-import { getStatusBadge, formatDateRange } from '@/lib/utils/event'
+import { Heart, MapPin, Calendar, Flag, Edit, Trash2, PawPrint, Clock, Building2 } from 'lucide-react'
+import { getStatusBadge, formatDateRange, hasOpeningHours } from '@/lib/utils/event'
+import { usePlannedToggle } from '@/lib/hooks/use-planned-toggle'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import LogEventModal from './LogEventModal'
@@ -23,6 +24,7 @@ export default function EventCardComponent({ event }: EventCardProps) {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const supabase = createClient()
   const router = useRouter()
+  const planned = usePlannedToggle(event.id, event.is_purchased)
 
   // ユーザー情報を取得
   useEffect(() => {
@@ -111,9 +113,9 @@ export default function EventCardComponent({ event }: EventCardProps) {
           </div>
         )}
 
-        {/* 購入済みマーク（肉球） */}
-        {(event as any).is_purchased && (
-          <div className="absolute top-2 right-2 z-10 transform rotate-12 hover:rotate-6 hover:scale-110 transition-all duration-300 hover:animate-bounce">
+        {/* 行く予定マーク（肉球） */}
+        {planned.isPlanned && (
+          <div title="行く予定" className="absolute top-2 right-2 z-10 transform rotate-12 hover:rotate-6 hover:scale-110 transition-all duration-300 hover:animate-bounce">
             <div className="bg-gradient-to-br from-orange-400 via-pink-400 to-orange-500 p-2.5 rounded-full shadow-lg">
               <PawPrint className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
@@ -156,6 +158,13 @@ export default function EventCardComponent({ event }: EventCardProps) {
 
         {/* 情報 */}
         <div className="space-y-2 text-sm text-gray-600">
+          {event.maker && (
+            <div className="flex items-start gap-2">
+              <Building2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span className="line-clamp-1 font-semibold text-gray-700">{event.maker}</span>
+            </div>
+          )}
+
           {event.location && (
             <div className="flex items-start gap-2">
               <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -174,10 +183,10 @@ export default function EventCardComponent({ event }: EventCardProps) {
             </div>
           )}
 
-          {(event as any).opening_hours && (event as any).opening_hours !== 'none' && (
+          {hasOpeningHours(event.opening_hours) && (
             <div className="flex items-start gap-2">
               <Clock className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-500" />
-              <span className="text-blue-600 font-medium">{(event as any).opening_hours}</span>
+              <span className="text-blue-600 font-medium">{event.opening_hours}</span>
             </div>
           )}
 
@@ -203,19 +212,38 @@ export default function EventCardComponent({ event }: EventCardProps) {
           </div>
         )}
 
-        {/* 行ったボタンと編集・削除ボタン */}
+        {/* 行く予定・行ったボタンと編集・削除ボタン */}
         <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-          <button
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              setShowLogModal(true)
-            }}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-mint-green text-gray-800 rounded-2xl font-semibold hover:bg-opacity-80 transition-colors"
-          >
-            <Flag className="w-4 h-4" />
-            <span>行った🚩</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                planned.toggle()
+              }}
+              disabled={planned.isSaving}
+              aria-pressed={planned.isPlanned}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-2xl font-semibold transition-colors ${
+                planned.isPlanned
+                  ? 'bg-gradient-to-r from-orange-400 to-pink-400 text-white hover:opacity-90'
+                  : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
+              }`}
+            >
+              <PawPrint className="w-4 h-4" />
+              <span>{planned.isPlanned ? '行く予定✓' : '行く予定'}</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setShowLogModal(true)
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-mint-green text-gray-800 rounded-2xl font-semibold hover:bg-opacity-80 transition-colors"
+            >
+              <Flag className="w-4 h-4" />
+              <span>行った🚩</span>
+            </button>
+          </div>
 
           {/* ログインユーザーは編集・削除ボタンを表示 */}
           {currentUser && (
