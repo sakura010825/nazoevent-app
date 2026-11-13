@@ -3,7 +3,7 @@
 import { EventCard } from '@/types/event'
 import { Heart, MapPin, Calendar, Flag, Edit, Trash2, PawPrint, Clock, Building2 } from 'lucide-react'
 import { getStatusBadge, formatDateRange, hasOpeningHours } from '@/lib/utils/event'
-import { usePlannedToggle } from '@/lib/hooks/use-planned-toggle'
+import type { PlanStatus } from '@/lib/utils/event-status'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import LogEventModal from './LogEventModal'
@@ -13,18 +13,18 @@ import Link from 'next/link'
 
 interface EventCardProps {
   event: EventCard
+  /** なし / お気に入り / 行く予定（2人で共有） */
+  status: PlanStatus
+  onChangeStatus: (next: PlanStatus) => void
 }
 
-export default function EventCardComponent({ event }: EventCardProps) {
-  const [isFavorite, setIsFavorite] = useState(event.isFavorite || false)
-  const [isLoading, setIsLoading] = useState(false)
+export default function EventCardComponent({ event, status, onChangeStatus }: EventCardProps) {
   const [showLogModal, setShowLogModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const supabase = createClient()
   const router = useRouter()
-  const planned = usePlannedToggle(event.id, event.is_purchased)
 
   // ユーザー情報を取得
   useEffect(() => {
@@ -38,47 +38,11 @@ export default function EventCardComponent({ event }: EventCardProps) {
     event.days_until_end
   )
 
-  const handleFavoriteClick = async (e: React.MouseEvent) => {
+  // ♡ でお気に入りに入れる／外す（行く予定にするのはお気に入りタブから）
+  const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-
-    if (isLoading) return
-
-    setIsLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      alert('ログインが必要です')
-      setIsLoading(false)
-      return
-    }
-
-    try {
-      if (isFavorite) {
-        const { error } = await supabase
-          .from('user_event_logs')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('event_id', event.id)
-          .eq('status', 'FAVORITE')
-        if (error) throw error
-        setIsFavorite(false)
-      } else {
-        const { error } = await supabase
-          .from('user_event_logs')
-          .upsert({
-            user_id: user.id,
-            event_id: event.id,
-            status: 'FAVORITE',
-          })
-        if (error) throw error
-        setIsFavorite(true)
-      }
-    } catch (error) {
-      console.error('Error toggling favorite:', error)
-    } finally {
-      setIsLoading(false)
-    }
+    onChangeStatus(status === 'favorite' ? 'none' : 'favorite')
   }
 
   return (
@@ -114,7 +78,7 @@ export default function EventCardComponent({ event }: EventCardProps) {
         )}
 
         {/* 行く予定マーク（肉球） */}
-        {planned.isPlanned && (
+        {status === 'planned' && (
           <div title="行く予定" className="absolute top-2 right-2 z-10 transform rotate-12 hover:rotate-6 hover:scale-110 transition-all duration-300 hover:animate-bounce">
             <div className="bg-gradient-to-br from-orange-400 via-pink-400 to-orange-500 p-2.5 rounded-full shadow-lg">
               <PawPrint className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
@@ -131,21 +95,23 @@ export default function EventCardComponent({ event }: EventCardProps) {
           </div>
         </div>
 
-        {/* お気に入りボタン */}
-        <button
-          onClick={handleFavoriteClick}
-          disabled={isLoading}
-          className={`absolute bottom-3 right-3 p-2 rounded-full bg-white shadow-md hover:scale-110 active:scale-95 transition-all duration-200 ${
-            isFavorite ? 'text-soft-coral animate-pulse-once' : 'text-gray-400'
-          }`}
-          aria-label={isFavorite ? 'お気に入りから削除' : 'お気に入りに追加'}
-        >
-          <Heart 
-            className={`w-5 h-5 transition-all duration-200 ${
-              isFavorite ? 'fill-current scale-110' : ''
-            }`} 
-          />
-        </button>
+        {/* お気に入りボタン（行く予定のイベントは右上の肉球マークで表示するので出さない） */}
+        {status !== 'planned' && (
+          <button
+            onClick={handleFavoriteClick}
+            className={`absolute bottom-3 right-3 p-2 rounded-full bg-white shadow-md hover:scale-110 active:scale-95 transition-all duration-200 ${
+              status === 'favorite' ? 'text-soft-coral' : 'text-gray-400'
+            }`}
+            aria-label={status === 'favorite' ? 'お気に入りから外す' : 'お気に入りに入れる'}
+            aria-pressed={status === 'favorite'}
+          >
+            <Heart
+              className={`w-5 h-5 transition-all duration-200 ${
+                status === 'favorite' ? 'fill-current scale-110' : ''
+              }`}
+            />
+          </button>
+        )}
       </div>
 
       {/* コンテンツ */}
@@ -201,49 +167,27 @@ export default function EventCardComponent({ event }: EventCardProps) {
         </div>
 
         {/* 統計情報 */}
-        {(event.favorite_count > 0 || event.went_count > 0) && (
+        {event.went_count > 0 && (
           <div className="mt-3 pt-3 border-t border-gray-100 flex gap-4 text-xs text-gray-500">
-            {event.favorite_count > 0 && (
-              <span>❤️ {event.favorite_count}人が気になる</span>
-            )}
             {event.went_count > 0 && (
               <span>🚩 {event.went_count}人が行った</span>
             )}
           </div>
         )}
 
-        {/* 行く予定・行ったボタンと編集・削除ボタン */}
+        {/* 行ったボタンと編集・削除ボタン */}
         <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-          <div className="flex gap-2">
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                planned.toggle()
-              }}
-              disabled={planned.isSaving}
-              aria-pressed={planned.isPlanned}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-2xl font-semibold transition-colors ${
-                planned.isPlanned
-                  ? 'bg-gradient-to-r from-orange-400 to-pink-400 text-white hover:opacity-90'
-                  : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
-              }`}
-            >
-              <PawPrint className="w-4 h-4" />
-              <span>{planned.isPlanned ? '行く予定✓' : '行く予定'}</span>
-            </button>
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setShowLogModal(true)
-              }}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-mint-green text-gray-800 rounded-2xl font-semibold hover:bg-opacity-80 transition-colors"
-            >
-              <Flag className="w-4 h-4" />
-              <span>行った🚩</span>
-            </button>
-          </div>
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setShowLogModal(true)
+            }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-mint-green text-gray-800 rounded-2xl font-semibold hover:bg-opacity-80 transition-colors"
+          >
+            <Flag className="w-4 h-4" />
+            <span>行った🚩</span>
+          </button>
 
           {/* ログインユーザーは編集・削除ボタンを表示 */}
           {currentUser && (

@@ -29,20 +29,6 @@ export default async function EventDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // ユーザーのお気に入り情報を取得
-  const { data: { user } } = await supabase.auth.getUser()
-  let isFavorite = false
-  if (user?.id) {
-    const { data: favorite } = await supabase
-      .from('user_event_logs')
-      .select('id')
-      .eq('user_id', user.id as any)
-      .eq('event_id', event.id)
-      .eq('status', 'FAVORITE' as any)
-      .single()
-    isFavorite = !!favorite
-  }
-
   // 過去のクロールで広告ページ等が official_url に入っているデータがあるため、
   // 表示時にも不正なURLを弾いてナゾヒロバのページにフォールバックする
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -203,16 +189,13 @@ export default async function EventDetailPage({ params }: PageProps) {
 
             {/* アクションボタン */}
             <div className="mt-6 pt-6 border-t border-gray-200 space-y-4">
-              <EventActions event={event as any} initialIsFavorite={isFavorite} />
+              <EventActions event={event as any} />
               <EventDetailActions event={event as any} />
             </div>
 
             {/* 統計情報 */}
-            {(event.favorite_count > 0 || event.went_count > 0) && (
+            {event.went_count > 0 && (
               <div className="mt-6 pt-6 border-t border-gray-200 flex gap-6 text-sm text-gray-500">
-                {event.favorite_count > 0 && (
-                  <span>❤️ {event.favorite_count}人が気になる</span>
-                )}
                 {event.went_count > 0 && (
                   <span>🚩 {event.went_count}人が行った</span>
                 )}

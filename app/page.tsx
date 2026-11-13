@@ -25,23 +25,9 @@ export default async function Home() {
     .order('start_date', { ascending: true }) // 開催日順（早い順）
     .order('created_at', { ascending: false }) // 同じ開催日の場合は新しい順
 
-  // ユーザーのお気に入り情報を取得
-  let favoriteEventIds: string[] = []
-  if (user?.id) {
-    const userId = user.id
-    const { data: favorites } = await supabase
-      .from('user_event_logs')
-      .select('event_id')
-      .eq('user_id', userId as any)
-      .eq('status', 'FAVORITE' as any)
-    favoriteEventIds = (favorites as any)?.map((f: any) => f.event_id) || []
-  }
-
-  // イベントにお気に入り情報を追加
-  const eventsWithFavorite = (events || []).map((event: any) => ({
-    ...event,
-    isFavorite: favoriteEventIds.includes(event.id),
-  }))
+  // お気に入り・行く予定は2人で共有するステータスなので、ビューの favorite_count / is_purchased から判定する
+  // （lib/utils/event-status.ts の getPlanStatus）
+  const eventsWithFavorite = events || []
 
   if (error) {
     console.error('Error fetching events:', error)

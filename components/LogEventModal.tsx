@@ -5,6 +5,7 @@ import { X, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { EventCard } from '@/types/event'
+import { getPlanStatus, requestPlanStatus } from '@/lib/utils/event-status'
 
 interface LogEventModalProps {
   event: EventCard
@@ -47,14 +48,9 @@ export default function LogEventModal({ event, onClose }: LogEventModalProps) {
         console.error('Error logging event:', error)
         alert('記録の保存に失敗しました')
       } else {
-        // 行ったイベントは「行く予定」から外す（is_purchased を「行く予定」として使っている）
-        if (event.is_purchased) {
-          const { error: plannedError } = await supabase
-            .from('events')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .update({ is_purchased: false } as any)
-            .eq('id', event.id)
-          if (plannedError) console.error('Error clearing planned:', plannedError)
+        // 行ったイベントは お気に入り・行く予定 のどちらからも外す
+        if (getPlanStatus(event) !== 'none') {
+          await requestPlanStatus(event.id, 'none').catch((err) => console.error('Error clearing status:', err))
         }
         router.refresh()
         onClose()

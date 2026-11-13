@@ -29,7 +29,7 @@ export interface Database {
           created_by: string
           created_at: string
           updated_at: string
-          /** 「行く予定」フラグ（旧: チケット購入済み）。イベント単位で全員共有 */
+          /** 「行く予定」フラグ（旧: チケット購入済み）。イベント単位で全員共有。変更は lib/utils/event-status.ts 経由 */
           is_purchased: boolean
           is_deleted: boolean
         }
