@@ -83,10 +83,11 @@ async function fetchTotalPages(url: string): Promise<number> {
 }
 
 /**
- * ナゾヒロバのイベント詳細ページから開催場所を取得する
- * 詳細情報テーブルの「場所」行から値を抽出
+ * ナゾヒロバのイベント詳細ページの詳細情報テーブル（.MysteryFiltersRow）を
+ * { 行タイトル: 値 } の形で取得する。例: { 場所: '…', 制作元: 'SCRAP', 開催期間: '…' }
+ * ページが取れなかったときは null
  */
-export async function fetchLocationFromNazohiroba(nazohirobaEventUrl: string): Promise<string | null> {
+export async function fetchNazohirobaDetailRows(nazohirobaEventUrl: string): Promise<Record<string, string> | null> {
   try {
     const response = await fetch(nazohirobaEventUrl, {
       headers: {
@@ -99,20 +100,34 @@ export async function fetchLocationFromNazohiroba(nazohirobaEventUrl: string): P
     const html = await response.text()
     const $ = load(html)
 
-    // .MysteryFiltersRow-title が「場所」の行を探し、同じ行の .MysteryFiltersRow-text を取得
-    let location: string | null = null
+    const rows: Record<string, string> = {}
     $('.MysteryFiltersRow').each((_, row) => {
       const title = $(row).find('.MysteryFiltersRow-title').text().trim()
-      if (title === '場所') {
-        const text = $(row).find('.MysteryFiltersRow-text').text().trim()
-        if (text) location = text
-      }
+      const text = $(row).find('.MysteryFiltersRow-text').text().trim()
+      if (title && text) rows[title] = text
     })
-
-    return location
+    return rows
   } catch {
     return null
   }
+}
+
+/**
+ * ナゾヒロバのイベント詳細ページから開催場所を取得する
+ * 詳細情報テーブルの「場所」行から値を抽出
+ */
+export async function fetchLocationFromNazohiroba(nazohirobaEventUrl: string): Promise<string | null> {
+  const rows = await fetchNazohirobaDetailRows(nazohirobaEventUrl)
+  return rows?.['場所'] || null
+}
+
+/**
+ * ナゾヒロバのイベント詳細ページから制作元（SCRAP、ヰ空間 など）を取得する
+ * 詳細情報テーブルの「制作元」行から値を抽出
+ */
+export async function fetchMakerFromNazohiroba(nazohirobaEventUrl: string): Promise<string | null> {
+  const rows = await fetchNazohirobaDetailRows(nazohirobaEventUrl)
+  return rows?.['制作元'] || null
 }
 
 // cheerio と @types/cheerio でエクスポート名が異なるため load() の戻り値から型を取る

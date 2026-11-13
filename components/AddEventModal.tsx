@@ -318,7 +318,7 @@ export default function AddEventModal({ onClose }: AddEventModalProps) {
             />
           </div>
 
-          {/* 購入済みチェックボックス */}
+          {/* 行く予定チェックボックス（DB上は is_purchased） */}
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -328,7 +328,7 @@ export default function AddEventModal({ onClose }: AddEventModalProps) {
               className="w-5 h-5 rounded border-gray-300 text-pastel-orange focus:ring-pastel-orange"
             />
             <label htmlFor="is_purchased" className="text-sm font-semibold text-gray-700">
-              チケット購入済み（参加可能）
+              行く予定🐾
             </label>
           </div>
 

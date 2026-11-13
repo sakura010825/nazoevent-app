@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Edit, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import EditEventModal from './EditEventModal'
+import { getReturnTarget } from '@/lib/utils/list-state'
 import { EventCard } from '@/types/event'
 
 interface EventDetailActionsProps {
@@ -55,7 +56,9 @@ export default function EventDetailActions({ event }: EventDetailActionsProps) {
                 alert('イベントの削除に失敗しました')
                 setIsDeleting(false)
               } else {
-                router.push('/')
+                // 削除後は開く前の一覧（タブ）に戻り、削除したイベントが消えた状態で表示する
+                router.push(getReturnTarget()?.listUrl ?? '/')
+                router.refresh()
               }
             }
           }}

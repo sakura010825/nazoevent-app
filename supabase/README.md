@@ -44,9 +44,11 @@ Supabaseの「Table Editor」で以下のテーブルが作成されているこ
 | location | text | 場所・集合場所 |
 | area | text | 都道府県・主要エリア |
 | type | text | 周遊/ホール/ルーム/オンライン |
-| maker | text | 制作団体 |
+| maker | text | 制作元（ナゾヒロバの「制作元」欄。`/api/crawl/backfill-maker` で補完） |
 | price | text | 価格情報 |
 | description | text | ストーリー・概要 |
+| is_purchased | boolean | **「行く予定」フラグ**（旧: チケット購入済み。2026-11 に意味を変更、列名はそのまま）。イベント単位なので全員で共有。「行った」を記録すると自動で false に戻る |
+| is_deleted | boolean | 論理削除フラグ |
 | created_by | uuid | 登録したユーザーID（auth.users参照） |
 | created_at | timestamp | 作成日時 |
 | updated_at | timestamp | 更新日時 |

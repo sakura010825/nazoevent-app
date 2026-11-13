@@ -1,13 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { MapPin, Calendar, ExternalLink, ArrowLeft, PawPrint, Clock } from 'lucide-react'
-import Link from 'next/link'
-import { formatDateRange } from '@/lib/utils/event'
+import { MapPin, Calendar, ExternalLink, ArrowLeft, PawPrint, Clock, Building2 } from 'lucide-react'
+import { formatDateRange, hasOpeningHours } from '@/lib/utils/event'
 import { sanitizeOfficialUrl } from '@/lib/utils/official-url'
 import HeaderAuth from '@/components/HeaderAuth'
 import EventActions from '@/components/EventActions'
 import EventImage from '@/components/EventImage'
 import EventDetailActions from '@/components/EventDetailActions'
+import BackToListLink from '@/components/BackToListLink'
 
 interface PageProps {
   params: {
@@ -53,10 +53,10 @@ export default async function EventDetailPage({ params }: PageProps) {
       {/* ヘッダー */}
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+          <BackToListLink className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
             <ArrowLeft className="w-5 h-5" />
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">NazoNote</h1>
-          </Link>
+          </BackToListLink>
           <HeaderAuth />
         </div>
       </header>
@@ -75,8 +75,8 @@ export default async function EventDetailPage({ params }: PageProps) {
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex-1">
                 {event.title}
               </h1>
-              {(event as any).is_purchased && (
-                <div className="transform rotate-12 hover:rotate-6 hover:scale-110 transition-all duration-300 hover:animate-bounce">
+              {event.is_purchased && (
+                <div title="行く予定" className="transform rotate-12 hover:rotate-6 hover:scale-110 transition-all duration-300 hover:animate-bounce">
                   <div className="bg-gradient-to-br from-orange-400 via-pink-400 to-orange-500 p-3 rounded-full shadow-lg">
                     <PawPrint className="w-8 h-8 text-white" />
                   </div>
@@ -86,6 +86,16 @@ export default async function EventDetailPage({ params }: PageProps) {
 
             {/* 基本情報 */}
             <div className="space-y-4 mb-6">
+              {event.maker && (
+                <div className="flex items-start gap-3">
+                  <Building2 className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">制作元</div>
+                    <div className="text-gray-800 font-semibold">{event.maker}</div>
+                  </div>
+                </div>
+              )}
+
               {event.location && (
                 <div className="flex items-start gap-3">
                   <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
@@ -124,16 +134,6 @@ export default async function EventDetailPage({ params }: PageProps) {
                 </div>
               )}
 
-              {event.maker && (
-                <div className="flex items-start gap-3">
-                  <div className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <div className="text-sm text-gray-500 mb-1">制作団体</div>
-                    <div className="text-gray-800">{event.maker}</div>
-                  </div>
-                </div>
-              )}
-
               {event.price && (
                 <div className="flex items-start gap-3">
                   <div className="w-5 h-5 mt-0.5 flex-shrink-0" />
@@ -144,12 +144,12 @@ export default async function EventDetailPage({ params }: PageProps) {
                 </div>
               )}
 
-              {(event as any).opening_hours && (event as any).opening_hours !== 'none' && (
+              {hasOpeningHours(event.opening_hours) && (
                 <div className="flex items-start gap-3">
                   <Clock className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="text-sm text-gray-500 mb-1">プレイ可能時間</div>
-                    <div className="text-blue-600 font-medium">{(event as any).opening_hours}</div>
+                    <div className="text-blue-600 font-medium">{event.opening_hours}</div>
                   </div>
                 </div>
               )}

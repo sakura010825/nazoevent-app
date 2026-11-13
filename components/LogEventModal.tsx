@@ -47,6 +47,15 @@ export default function LogEventModal({ event, onClose }: LogEventModalProps) {
         console.error('Error logging event:', error)
         alert('記録の保存に失敗しました')
       } else {
+        // 行ったイベントは「行く予定」から外す（is_purchased を「行く予定」として使っている）
+        if (event.is_purchased) {
+          const { error: plannedError } = await supabase
+            .from('events')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .update({ is_purchased: false } as any)
+            .eq('id', event.id)
+          if (plannedError) console.error('Error clearing planned:', plannedError)
+        }
         router.refresh()
         onClose()
       }

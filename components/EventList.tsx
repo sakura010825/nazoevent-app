@@ -2,203 +2,228 @@
 
 import { EventCard } from '@/types/event'
 import EventCardComponent from './EventCard'
-import { useState, useMemo } from 'react'
-import { Filter, ArrowUpDown } from 'lucide-react'
+import PlannedEventList from './PlannedEventList'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { saveListState, takeListScroll } from '@/lib/utils/list-state'
 
 interface EventListProps {
   events: EventCard[]
 }
 
-type SortOption = 
-  | 'created_desc' 
-  | 'created_asc' 
-  | 'event_date_asc' 
-  | 'event_date_desc' 
-  | 'title_asc'
-  | 'end_date_asc'
-  | 'end_date_desc'
+type TabKey = 'new' | 'ending' | 'going' | 'favorite'
 
-export default function EventList({ events: initialEvents }: EventListProps) {
-  const [filter, setFilter] = useState<'all' | 'favorite' | 'ongoing' | 'purchased'>('all')
-  const [areaFilter, setAreaFilter] = useState<string | null>(null)
-  const [sortOption, setSortOption] = useState<SortOption>('end_date_asc')
+const TABS: { key: TabKey; label: string; description: string }[] = [
+  { key: 'new', label: '新着順', description: 'アプリに登録された新しい順' },
+  { key: 'ending', label: '終了が近い順', description: '終了日が近い順（終了日未定は最後）' },
+  { key: 'going', label: '行く予定', description: '終了日が近い順' },
+  { key: 'favorite', label: 'お気に入り', description: '終了日が近い順' },
+]
+const DEFAULT_TAB: TabKey = 'new'
 
-  // フィルター適用とソート
-  const filteredEvents = useMemo(() => {
-    let filtered = initialEvents.filter((event) => {
-      if (filter === 'favorite' && (!event.isFavorite && event.favorite_count === 0)) {
-        return false
-      }
-      if (filter === 'ongoing' && event.current_status !== '開催中') {
-        return false
-      }
-      if (filter === 'purchased' && !(event as any).is_purchased) {
-        return false
-      }
-      if (areaFilter && event.area !== areaFilter) {
-        return false
-      }
-      return true
-    })
+function parseTab(value: string | null): TabKey {
+  return TABS.some((t) => t.key === value) ? (value as TabKey) : DEFAULT_TAB
+}
 
-    // ソート適用
-    filtered = [...filtered].sort((a, b) => {
-      switch (sortOption) {
-        case 'created_desc':
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        case 'created_asc':
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        case 'event_date_asc':
-          return new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
-        case 'event_date_desc':
-          return new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-        case 'title_asc':
-          return a.title.localeCompare(b.title, 'ja')
-        case 'end_date_asc':
-          // 終了日が近い順：日付の昇順、未設定（null）は最後
-          if (a.end_date === null && b.end_date === null) return 0
-          if (a.end_date === null) return 1 // aがnullなら後ろに
-          if (b.end_date === null) return -1 // bがnullなら後ろに
-          return new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
-        case 'end_date_desc':
-          // 終了日が遠い順：日付の降順、未設定（null）は最初（無限の未来として扱う）
-          if (a.end_date === null && b.end_date === null) return 0
-          if (a.end_date === null) return -1 // aがnullなら前に
-          if (b.end_date === null) return 1 // bがnullなら前に
-          return new Date(b.end_date).getTime() - new Date(a.end_date).getTime()
-        default:
-          return 0
+/** 終了日が近い順。終了日未定（常設）は最後、同じ終了日なら開始日が早い順 */
+function byEndDate(a: EventCard, b: EventCard): number {
+  if (a.end_date !== b.end_date) {
+    if (a.end_date === null) return 1
+    if (b.end_date === null) return -1
+    return a.end_date < b.end_date ? -1 : 1
+  }
+  return a.start_date < b.start_date ? -1 : a.start_date > b.start_date ? 1 : 0
+}
+
+function byCreatedDesc(a: EventCard, b: EventCard): number {
+  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+}
+
+/** 「東京都」と「東京」のような表記ゆれを1つのエリアにまとめる */
+function normalizeArea(area: string | null): string | null {
+  return area ? area.replace(/[都府県]$/, '') : null
+}
+
+function isFavoriteEvent(event: EventCard): boolean {
+  return !!event.isFavorite || event.favorite_count > 0
+}
+
+export default function EventList({ events }: EventListProps) {
+  // タブ・エリアは URL のクエリに持たせる（詳細ページから戻ったときに同じタブで開くため）
+  const searchParams = useSearchParams()
+  const tab = parseTab(searchParams.get('tab'))
+  const areaFilter = searchParams.get('area')
+
+  const tabsAnchorRef = useRef<HTMLDivElement>(null)
+  const [headerHeight, setHeaderHeight] = useState(0)
+
+  // ページ上部のヘッダー（sticky）の高さを測って、タブをその直下に貼り付ける
+  useEffect(() => {
+    const header = document.querySelector('header')
+    if (!header) return
+    const update = () => setHeaderHeight(header.getBoundingClientRect().height)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [])
+
+  // 詳細ページから戻ってきたら、開く前のスクロール位置に戻す
+  useEffect(() => {
+    const y = takeListScroll()
+    if (y === null) return
+    let frame = 0
+    let tries = 0
+    const restore = () => {
+      const maxY = document.documentElement.scrollHeight - window.innerHeight
+      // 描画が追いつくまで数フレーム待つ
+      if (maxY < y && tries < 60) {
+        tries++
+        frame = requestAnimationFrame(restore)
+        return
       }
-    })
+      window.scrollTo(0, y)
+    }
+    frame = requestAnimationFrame(restore)
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
-    return filtered
-  }, [initialEvents, filter, areaFilter, sortOption])
+  const updateQuery = (next: { tab?: TabKey; area?: string | null }) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (next.tab !== undefined) {
+      if (next.tab === DEFAULT_TAB) params.delete('tab')
+      else params.set('tab', next.tab)
+    }
+    if (next.area !== undefined) {
+      if (next.area === null) params.delete('area')
+      else params.set('area', next.area)
+    }
+    const query = params.toString()
+    // サーバーへの再取得をせず URL だけ書き換える（Next.js が useSearchParams に反映してくれる）
+    window.history.replaceState(null, '', query ? `?${query}` : window.location.pathname)
 
-  // エリア一覧を取得
-  const areas = Array.from(new Set(initialEvents.map(e => e.area).filter(Boolean))) as string[]
+    // 下までスクロールしていたら、切り替えた一覧の先頭が見える位置まで戻す
+    const anchor = tabsAnchorRef.current
+    if (anchor) {
+      const top = anchor.getBoundingClientRect().top + window.scrollY - headerHeight
+      if (window.scrollY > top) window.scrollTo(0, top)
+    }
+  }
+
+  const areas = useMemo(
+    () => Array.from(new Set(events.map((e) => normalizeArea(e.area)).filter(Boolean))) as string[],
+    [events]
+  )
+
+  const areaEvents = useMemo(
+    () => (areaFilter ? events.filter((e) => normalizeArea(e.area) === areaFilter) : events),
+    [events, areaFilter]
+  )
+
+  const tabEvents = useMemo<Record<TabKey, EventCard[]>>(
+    () => ({
+      new: [...areaEvents].sort(byCreatedDesc),
+      ending: [...areaEvents].sort(byEndDate),
+      going: areaEvents.filter((e) => e.is_purchased).sort(byEndDate),
+      favorite: areaEvents.filter(isFavoriteEvent).sort(byEndDate),
+    }),
+    [areaEvents]
+  )
+
+  const visibleEvents = tabEvents[tab]
+  const currentTab = TABS.find((t) => t.key === tab)!
 
   return (
-    <div className="space-y-6">
-      {/* ソート・フィルターバー */}
-      <div className="bg-white rounded-3xl p-3 sm:p-4 shadow-soft">
-        {/* ソート */}
-        <div className="mb-4 pb-4 border-b border-gray-200">
-          <div className="flex items-center gap-2 mb-2">
-            <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-            <span className="text-sm sm:text-base font-semibold text-gray-700">並び替え</span>
-          </div>
-          <select
-            value={sortOption}
-            onChange={(e) => setSortOption(e.target.value as SortOption)}
-            className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pastel-orange text-sm sm:text-base"
-          >
-            <option value="created_desc">作成日（新しい順）</option>
-            <option value="created_asc">作成日（古い順）</option>
-            <option value="event_date_asc">イベント日（近い順）</option>
-            <option value="event_date_desc">イベント日（遠い順）</option>
-            <option value="title_asc">タイトル（五十音順）</option>
-            <option value="end_date_asc">イベント終了日（近い順）</option>
-            <option value="end_date_desc">イベント終了日（遠い順）</option>
-          </select>
-        </div>
+    <div
+      // カード・行のどれをタップしても、開く直前の一覧の状態を保存する
+      onClickCapture={(e) => {
+        const link = (e.target as HTMLElement).closest('a[href^="/events/"]')
+        if (link) saveListState(link.getAttribute('href')!)
+      }}
+    >
+      <div ref={tabsAnchorRef} aria-hidden />
 
-        {/* フィルター */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Filter className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-            <span className="text-sm sm:text-base font-semibold text-gray-700">フィルター</span>
-          </div>
-        
-          {/* ステータスフィルター */}
-          <div className="flex flex-wrap gap-2 mb-3">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-                filter === 'all'
-                  ? 'bg-pastel-orange text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              すべて
-            </button>
-            <button
-              onClick={() => setFilter('favorite')}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-                filter === 'favorite'
-                  ? 'bg-pastel-orange text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              お気に入り❤️
-            </button>
-            <button
-              onClick={() => setFilter('ongoing')}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-                filter === 'ongoing'
-                  ? 'bg-pastel-orange text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              開催中
-            </button>
-            <button
-              onClick={() => setFilter('purchased')}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-                filter === 'purchased'
-                  ? 'bg-pastel-orange text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              チケット購入済み🐾
-            </button>
-          </div>
-
-          {/* エリアフィルター */}
-          {areas.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+      {/* タブ（ヘッダーの下に貼り付く） */}
+      <div className="sticky z-[5] -mx-4 px-4 py-2" style={{ top: headerHeight, backgroundColor: 'var(--background, #FFFBF0)' }}>
+        <div role="tablist" aria-label="一覧の切り替え" className="grid grid-cols-4 gap-1 bg-white rounded-2xl p-1 shadow-soft">
+          {TABS.map((t) => {
+            const active = t.key === tab
+            const count = t.key === 'going' || t.key === 'favorite' ? tabEvents[t.key].length : null
+            return (
               <button
-                onClick={() => setAreaFilter(null)}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-                  areaFilter === null
-                    ? 'bg-mint-green text-gray-800'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                key={t.key}
+                role="tab"
+                aria-selected={active}
+                onClick={() => updateQuery({ tab: t.key })}
+                className={`relative px-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${
+                  active ? 'bg-pastel-orange text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                すべてのエリア
+                {t.label}
+                {count !== null && (
+                  <span
+                    className={`absolute -top-1.5 -right-0.5 min-w-[1.25rem] px-1 rounded-full text-[10px] leading-5 font-bold ${
+                      active ? 'bg-white text-orange-500 ring-1 ring-orange-200' : 'bg-orange-100 text-orange-600'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
               </button>
-              {areas.map((area) => (
-                <button
-                  key={area}
-                  onClick={() => setAreaFilter(area)}
-                  className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-                    areaFilter === area
-                      ? 'bg-mint-green text-gray-800'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {area}
-                </button>
-              ))}
-            </div>
-          )}
+            )
+          })}
         </div>
       </div>
 
-      {/* イベントカード一覧 */}
-      {filteredEvents.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">イベントが見つかりませんでした</p>
-          <p className="text-gray-400 text-sm mt-2">
-            新しいイベントを追加してみましょう！
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredEvents.map((event) => (
-            <EventCardComponent key={event.id} event={event} />
-          ))}
-        </div>
-      )}
+      <div className="space-y-3 mt-2">
+        {/* エリア絞り込み */}
+        {areas.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {[null, ...areas].map((area) => {
+              const active = areaFilter === area
+              return (
+                <button
+                  key={area ?? 'all'}
+                  onClick={() => updateQuery({ area })}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    active ? 'bg-mint-green text-gray-800' : 'bg-white text-gray-600 hover:bg-gray-100 shadow-soft'
+                  }`}
+                >
+                  {area ?? 'すべてのエリア'}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-500 px-1">
+          {visibleEvents.length}件・{currentTab.description}
+        </p>
+
+        {visibleEvents.length === 0 ? (
+          <div className="text-center py-12">
+            {tab === 'going' ? (
+              <>
+                <p className="text-gray-500 text-lg">行く予定のイベントはまだありません</p>
+                <p className="text-gray-400 text-sm mt-2">イベントの「行く予定🐾」ボタンで追加できます</p>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-500 text-lg">イベントが見つかりませんでした</p>
+                <p className="text-gray-400 text-sm mt-2">新しいイベントを追加してみましょう！</p>
+              </>
+            )}
+          </div>
+        ) : tab === 'going' ? (
+          <PlannedEventList events={visibleEvents} />
+        ) : (
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleEvents.map((event) => (
+              <EventCardComponent key={event.id} event={event} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

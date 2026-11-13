@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { collectAllEventUrls, fetchOfficialUrl, fetchLocationFromNazohiroba, TARGET_PREFECTURE_NAMES } from '@/lib/crawler/nazohiroba'
+import { collectAllEventUrls, fetchOfficialUrl, fetchNazohirobaDetailRows, TARGET_PREFECTURE_NAMES } from '@/lib/crawler/nazohiroba'
 import { extractEventFromUrl } from '@/lib/ai/extract-event'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendCrawlNotification } from '@/lib/notify/gmail'
@@ -96,18 +96,18 @@ export async function GET(request: NextRequest) {
           console.log(`[crawl] 公式URL取得: ${officialUrl}`)
         }
 
-        // locationがnullの場合、nazohirobaページから場所をスクレイピング
+        // ナゾヒロバの詳細情報テーブル（場所・制作元など）を取得
+        const detailRows = await fetchNazohirobaDetailRows(url)
+
+        // locationがnullの場合、nazohirobaページの「場所」を使う
         let location = extracted.location || null
-        if (!location) {
-          try {
-            location = await fetchLocationFromNazohiroba(url)
-            if (location) {
-              console.log(`[crawl] nazohirobaから場所取得: ${location}`)
-            }
-          } catch (err) {
-            console.warn(`[crawl] 場所取得失敗: ${err}`)
-          }
+        if (!location && detailRows?.['場所']) {
+          location = detailRows['場所']
+          console.log(`[crawl] nazohirobaから場所取得: ${location}`)
         }
+
+        // 制作元はナゾヒロバの「制作元」欄を優先（AIは空文字や長い主催者表記を返しがち）
+        const maker = detailRows?.['制作元'] || extracted.maker || null
 
         // DBに登録
         const { error: insertError } = await supabase.from('events').insert({
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
           location,
           area,
           type: extracted.type || null,
-          maker: extracted.maker || null,
+          maker,
           price: extracted.price || null,
           description: extracted.description || null,
           duration_text: extracted.duration_text || null,
