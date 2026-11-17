@@ -1,7 +1,14 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { Database } from '@/types/database'
 
+/**
+ * サーバー（Server Component / Route Handler）用の Supabase クライアント。
+ * ブラウザがCookieに保存したログイン情報を読む。
+ *
+ * 注意: インストールされている @supabase/ssr は 0.1.0 で、Cookie は get / set / remove で渡す。
+ * 新しい版の getAll / setAll を渡すと無視され、サーバー側では常に「未ログイン」扱いになる。
+ */
 export async function createClient() {
   const cookieStore = await cookies()
 
@@ -10,22 +17,24 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll()
+        get(name: string) {
+          return cookieStore.get(name)?.value
         },
-        setAll(cookiesToSet: any[]) {
+        set(name: string, value: string, options: CookieOptions) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
+            cookieStore.set({ name, value, ...options })
           } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
+            // Server Component から呼ばれた場合は書き込めない（middleware がセッションを更新するので問題なし）
           }
         },
-      } as any,
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value: '', ...options })
+          } catch {
+            // 同上
+          }
+        },
+      },
     }
   )
 }
-

@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
@@ -8,28 +8,38 @@ export async function middleware(request: NextRequest) {
     },
   })
 
+  // @supabase/ssr 0.1.0 は Cookie を get / set / remove で受け取る（getAll / setAll は無視される）
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
+        get(name: string) {
+          return request.cookies.get(name)?.value
         },
-        setAll(cookiesToSet: any[]) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+        set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({ name, value, ...options })
           response = NextResponse.next({
-            request,
+            request: {
+              headers: request.headers,
+            },
           })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
+          response.cookies.set({ name, value, ...options })
         },
-      } as any,
+        remove(name: string, options: CookieOptions) {
+          request.cookies.set({ name, value: '', ...options })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({ name, value: '', ...options })
+        },
+      },
     }
   )
 
-  // 認証セッションをリフレッシュ
+  // 認証セッションをリフレッシュ（期限切れのアクセストークンを更新してCookieに書き戻す）
   await supabase.auth.getUser()
 
   return response
@@ -48,4 +58,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
-
